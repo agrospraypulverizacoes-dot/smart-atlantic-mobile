@@ -29,11 +29,13 @@ class _KmlImportPageState extends State<KmlImportPage> {
       final failures = <String>[];
       for (final file in files) {
         try {
-          if (!file.name.toLowerCase().endsWith('.kml') ||
-              file.size > 5 * 1024 * 1024) {
+          if (!file.name.toLowerCase().endsWith('.kml')) {
             throw const FormatException('Arquivo não é KML ou excede 5 MB.');
           }
           final data = await file.readAsBytes();
+          if (data.lengthInBytes > 5 * 1024 * 1024) {
+            throw const FormatException('KML maior que 5 MB.');
+          }
           found.addAll(readKmlPlots(utf8.decode(data), file.name));
         } catch (error) {
           failures.add([file.name, error.toString()].join(': '));
