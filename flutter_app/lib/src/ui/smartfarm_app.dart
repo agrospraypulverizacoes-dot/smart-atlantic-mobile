@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import '../data/smartfarm_api.dart';
+import '../plots/kml_import_page.dart';
 
 const _background = Color(0xFF07131C);
 const _card = Color(0xFF142A34);
@@ -308,6 +309,17 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
         ),
         actions: [
+          if (_tab == 1)
+            IconButton(
+              key: const Key('import-kml'),
+              tooltip: 'Importar KML',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const KmlImportPage(),
+                ),
+              ),
+              icon: const Icon(Icons.upload_file_outlined),
+            ),
           if (_tab >= 1 && _tab <= 3)
             IconButton(
               key: const Key('reload'),
