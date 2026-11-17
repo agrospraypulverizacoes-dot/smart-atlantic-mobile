@@ -285,7 +285,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(15),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -296,7 +296,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                   Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.w800,
                       height: 1.15,
                       color: _onAccent,
@@ -333,6 +333,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
   }
 
   Widget _loginScreen() {
+    final compact = MediaQuery.sizeOf(context).height < 720;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -340,18 +341,18 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
             constraints: const BoxConstraints(maxWidth: 460),
             child: ListView(
               shrinkWrap: true,
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 26),
+              padding: EdgeInsets.symmetric(horizontal: 22, vertical: compact ? 12 : 26),
               children: [
-                Center(child: _logo(width: 270)),
-                const SizedBox(height: 23),
+                Center(child: SizedBox(height: compact ? 43 : 62, child: _logo(width: 270))),
+                SizedBox(height: compact ? 8 : 23),
                 _photoBanner(
                   title: 'Gestão agrícola em suas mãos.',
                   subtitle: 'Precisão e controle em cada operação.',
-                  height: 175,
+                  height: compact ? 134 : 175,
                 ),
-                const SizedBox(height: 21),
+                SizedBox(height: compact ? 10 : 21),
                 _sectionLabel('ACESSO À PLATAFORMA'),
-                const SizedBox(height: 9),
+                SizedBox(height: compact ? 4 : 9),
                 const Text(
                   'Entre na sua conta',
                   style: TextStyle(
@@ -365,10 +366,10 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                   'Acesse com sua conta EAVision pelo SmartFarm Atlantic.',
                   style: TextStyle(color: _muted, fontSize: 13),
                 ),
-                const SizedBox(height: 19),
+                SizedBox(height: compact ? 10 : 19),
                 Container(
                   decoration: _panelDecoration(borderColor: _outline),
-                  padding: const EdgeInsets.all(18),
+                  padding: EdgeInsets.all(compact ? 13 : 18),
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -388,7 +389,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                                   ? 'Informe seu usuário'
                                   : null,
                         ),
-                        const SizedBox(height: 13),
+                        SizedBox(height: compact ? 9 : 13),
                         TextFormField(
                           key: const Key('password'),
                           controller: _password,
@@ -403,7 +404,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                                   : null,
                           onFieldSubmitted: (_) => _login(),
                         ),
-                        const SizedBox(height: 18),
+                        SizedBox(height: compact ? 10 : 18),
                         FilledButton.icon(
                           key: const Key('submit-login'),
                           onPressed: _busy ? null : _login,
@@ -433,7 +434,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                     textAlign: TextAlign.center,
                   ),
                 ],
-                const SizedBox(height: 25),
+                SizedBox(height: compact ? 10 : 25),
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
