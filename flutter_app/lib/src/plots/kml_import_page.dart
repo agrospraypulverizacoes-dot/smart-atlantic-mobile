@@ -62,10 +62,10 @@ class _KmlImportPageState extends State<KmlImportPage> {
       body: ListView(
         padding: const EdgeInsets.all(18),
         children: [
-          const Text('Importação local de talhões',
+          const Text('Gestão de talhões',
             style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('Escolha arquivos KML para separar os contornos e '
+          const Text('Importe arquivos KML para separar os contornos e 
               'visualizar cada talhão com nome e coordenadas originais.'),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -88,7 +88,7 @@ class _KmlImportPageState extends State<KmlImportPage> {
             const SizedBox(height: 10),
             Container(
               height: 230,
-              color: const Color(0xFF142A34),
+              color: const Color(0xFF0E1A2A),
               child: CustomPaint(
                 painter: _BoundaryPainter(selected),
                 child: const SizedBox.expand(),
@@ -97,7 +97,7 @@ class _KmlImportPageState extends State<KmlImportPage> {
             const SizedBox(height: 8),
             const Text('Prévia geométrica local sem mapa de fundo. '
               'Ainda não corresponde a uma missão de voo.',
-              style: TextStyle(fontSize: 12, color: Color(0xFFA6BDC1))),
+              style: TextStyle(fontSize: 12, color: Color(0xFF9EAFC3))),
             const SizedBox(height: 12),
             for (var i = 0; i < _plots.length; i++)
               ListTile(
@@ -117,7 +117,7 @@ class _KmlImportPageState extends State<KmlImportPage> {
           const SizedBox(height: 12),
           const Text('Importação apenas nesta sessão, sem upload ao servidor. '
             'Persistência e mapa georreferenciado são etapas futuras.',
-            style: TextStyle(fontSize: 12, color: Color(0xFFA6BDC1))),
+            style: TextStyle(fontSize: 12, color: Color(0xFF9EAFC3))),
         ],
       ),
     );
@@ -156,7 +156,7 @@ class _BoundaryPainter extends CustomPainter {
     canvas.drawPath(outline, Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
-      ..color = const Color(0xFF67C23A));
+      ..color = const Color(0xFF1E78FF));
   }
   @override
   bool shouldRepaint(covariant _BoundaryPainter previous) =>

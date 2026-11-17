@@ -2,10 +2,17 @@ import 'package:material_ui/material_ui.dart';
 import '../data/smartfarm_api.dart';
 import '../plots/kml_import_page.dart';
 
-const _background = Color(0xFF07131C);
-const _card = Color(0xFF142A34);
-const _accent = Color(0xFF67C23A);
-const _muted = Color(0xFFA6BDC1);
+// Atlantic Smart Farm design tokens — fonte: RAG SMARTFARM/app/static/atlantic-theme.css.
+const _background = Color(0xFF071019);
+const _card = Color(0xFF0E1A2A);
+const _panel = Color(0xFF081422);
+const _accent = Color(0xFF1E78FF);
+const _positive = Color(0xFF67C23A);
+const _muted = Color(0xFF9EAFC3);
+const _outline = Color(0xFF263A50);
+const _onAccent = Color(0xFFF4F7FB);
+const _brand = 'assets/images/atlantic_smartfarm_brand.png';
+const _dronePhoto = 'assets/images/atlantic_drone.webp';
 
 class SmartFarmApp extends StatefulWidget {
   const SmartFarmApp({super.key, this.gateway});
@@ -45,11 +52,37 @@ class _SmartFarmAppState extends State<SmartFarmApp> {
           seedColor: _accent,
           brightness: Brightness.dark,
         ),
-        appBarTheme: const AppBarTheme(backgroundColor: _background),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: _background,
+          foregroundColor: _onAccent,
+          elevation: 0,
+          centerTitle: false,
+        ),
+        cardColor: _card,
+        dividerColor: _outline,
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: _panel,
+          indicatorColor: _accent.withValues(alpha: 0.18),
+          labelTextStyle: WidgetStateProperty.all(
+            const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          ),
+        ),
         inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          enabledBorder: OutlineInputBorder(
+            borderSide: const BorderSide(color: _outline),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderSide: const BorderSide(color: _accent, width: 1.5),
+            borderRadius: BorderRadius.circular(14),
+          ),
           filled: true,
-          fillColor: const Color(0xFF0B1B24),
+          fillColor: _panel,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 15,
+          ),
         ),
       ),
       home: _SmartFarmHome(gateway: _gateway),
@@ -186,16 +219,116 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
     return _user == null ? _loginScreen() : _mainScreen();
   }
 
-  Widget _logo() {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.agriculture_rounded, color: _accent, size: 30),
-        SizedBox(width: 10),
-        Text('ATLANTIC ', style: TextStyle(fontWeight: FontWeight.w900)),
-        Text('SMARTFARM',
-            style: TextStyle(color: _accent, fontWeight: FontWeight.w900)),
+
+  Widget _logo({double width = 230}) {
+    return Image.asset(
+      _brand,
+      width: width,
+      height: 62,
+      fit: BoxFit.contain,
+      alignment: Alignment.centerLeft,
+      semanticLabel: 'Atlantic Smart Farm',
+    );
+  }
+
+  Widget _sectionLabel(String text, {Color color = _muted}) {
+    return Text(
+      text.toUpperCase(),
+      style: TextStyle(
+        color: color,
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.7,
+      ),
+    );
+  }
+
+  BoxDecoration _panelDecoration({Color? borderColor}) {
+    return BoxDecoration(
+      color: _card,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: borderColor ?? _outline),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x33000000),
+          blurRadius: 18,
+          offset: Offset(0, 10),
+        ),
       ],
+    );
+  }
+
+  Widget _photoBanner({
+    required String title,
+    required String subtitle,
+    double height = 190,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: SizedBox(
+        height: height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(_dronePhoto, fit: BoxFit.cover),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0xF4071019),
+                    Color(0xD4071019),
+                    Color(0x5C071019),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _sectionLabel('ATLANTIC DRONES  /  SMART FARM',
+                      color: _positive),
+                  const SizedBox(height: 10),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      height: 1.15,
+                      color: _onAccent,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFFD6E1EC),
+                      fontSize: 12,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 13,
+              right: 13,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: _positive,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -204,94 +337,114 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 430),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: ListView(
               shrinkWrap: true,
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 26),
               children: [
-                _logo(),
-                const SizedBox(height: 45),
+                Center(child: _logo(width: 270)),
+                const SizedBox(height: 23),
+                _photoBanner(
+                  title: 'Gestão agrícola em suas mãos.',
+                  subtitle: 'Precisão e controle em cada operação.',
+                  height: 175,
+                ),
+                const SizedBox(height: 21),
+                _sectionLabel('ACESSO À PLATAFORMA'),
+                const SizedBox(height: 9),
                 const Text(
-                  'Gestão agrícola em suas mãos.',
+                  'Entre na sua conta',
                   style: TextStyle(
-                    fontSize: 30,
-                    height: 1.15,
+                    fontSize: 24,
                     fontWeight: FontWeight.w800,
+                    color: _onAccent,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
                 const Text(
                   'Acesse com sua conta EAVision pelo SmartFarm Atlantic.',
-                  style: TextStyle(color: _muted),
+                  style: TextStyle(color: _muted, fontSize: 13),
                 ),
-                const SizedBox(height: 28),
-                Card(
-                  color: _card,
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TextFormField(
-                            key: const Key('username'),
-                            controller: _username,
-                            autofocus: false,
-                            textInputAction: TextInputAction.next,
-                            autocorrect: false,
-                            decoration: const InputDecoration(
-                              labelText: 'Usuário',
-                              prefixIcon: Icon(Icons.person_outline),
-                            ),
-                            validator: (value) =>
-                                value == null || value.trim().isEmpty
-                                    ? 'Informe seu usuário'
-                                    : null,
+                const SizedBox(height: 19),
+                Container(
+                  decoration: _panelDecoration(borderColor: _outline),
+                  padding: const EdgeInsets.all(18),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          key: const Key('username'),
+                          controller: _username,
+                          textInputAction: TextInputAction.next,
+                          autocorrect: false,
+                          decoration: const InputDecoration(
+                            labelText: 'Usuário',
+                            prefixIcon: Icon(Icons.person_outline, color: _muted),
                           ),
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            key: const Key('password'),
-                            controller: _password,
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Senha',
-                              prefixIcon: Icon(Icons.lock_outline),
-                            ),
-                            validator: (value) =>
-                                value == null || value.isEmpty
-                                    ? 'Informe sua senha'
-                                    : null,
-                            onFieldSubmitted: (_) => _login(),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                                  ? 'Informe seu usuário'
+                                  : null,
+                        ),
+                        const SizedBox(height: 13),
+                        TextFormField(
+                          key: const Key('password'),
+                          controller: _password,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Senha',
+                            prefixIcon: Icon(Icons.lock_outline, color: _muted),
                           ),
-                          const SizedBox(height: 18),
-                          FilledButton(
-                            key: const Key('submit-login'),
-                            onPressed: _busy ? null : _login,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _accent,
-                              foregroundColor: _background,
-                              padding: const EdgeInsets.all(16),
+                          validator: (value) =>
+                              value == null || value.isEmpty
+                                  ? 'Informe sua senha'
+                                  : null,
+                          onFieldSubmitted: (_) => _login(),
+                        ),
+                        const SizedBox(height: 18),
+                        FilledButton.icon(
+                          key: const Key('submit-login'),
+                          onPressed: _busy ? null : _login,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _accent,
+                            foregroundColor: _onAccent,
+                            minimumSize: const Size.fromHeight(51),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                            child: Text(_busy ? 'Entrando...' : 'Entrar no SmartFarm'),
                           ),
-                        ],
-                      ),
+                          icon: const Icon(Icons.login_rounded, size: 19),
+                          label: Text(
+                            _busy ? 'Entrando...' : 'Entrar no SmartFarm',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
                 if (_error != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Text(
                     _error!,
-                    style: const TextStyle(color: Color(0xFFFF958D)),
+                    style: const TextStyle(color: Color(0xFFFF6F78)),
+                    textAlign: TextAlign.center,
                   ),
                 ],
                 const SizedBox(height: 25),
-                const Text(
-                  'Atlantic Drones • Acesso autenticado',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: _muted, fontSize: 12),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.verified_user_outlined,
+                        color: _positive, size: 15),
+                    SizedBox(width: 7),
+                    Text(
+                      'Atlantic Drones • Acesso autenticado',
+                      style: TextStyle(color: _muted, fontSize: 11),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -304,10 +457,8 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
   Widget _mainScreen() {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'ATLANTIC SMARTFARM',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
-        ),
+        title: _logo(width: 206),
+        toolbarHeight: 68,
         actions: [
           if (_tab == 1)
             IconButton(
@@ -327,6 +478,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
               onPressed: _busy ? null : () => _loadRecords(_tab),
               icon: const Icon(Icons.refresh),
             ),
+          const SizedBox(width: 7),
         ],
       ),
       body: SafeArea(
@@ -339,8 +491,9 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: _navigate,
-        backgroundColor: _card,
-        indicatorColor: _accent.withValues(alpha: 0.24),
+        backgroundColor: _panel,
+        indicatorColor: _accent.withValues(alpha: 0.20),
+        height: 76,
         destinations: const [
           NavigationDestination(
             key: Key('nav-home'),
@@ -372,51 +525,150 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
     );
   }
 
-  Widget _dashboard() {
-    const labels = [
-      ('Talhões', Icons.map_outlined, 'Consultar áreas agrícolas'),
-      ('Drones', Icons.flight_outlined, 'Consultar equipamentos'),
-      ('Operações', Icons.assignment_outlined, 'Consultar registros de voo'),
-    ];
-    return ListView(
-      padding: const EdgeInsets.all(22),
-      children: [
-        Text(
-          'Olá, ${_user ?? 'Usuário'}',
-          style: const TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Dados operacionais integrados ao SmartFarm Atlantic.',
-          style: TextStyle(color: _muted),
-        ),
-        const SizedBox(height: 20),
-        for (var index = 0; index < labels.length; index++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Card(
-              color: _card,
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 12,
+  Widget _shortcut({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: _panelDecoration(),
+      child: Material(
+        color: const Color(0x00000000),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 17),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: color, size: 25),
                 ),
-                leading: Icon(labels[index].$2, color: _accent, size: 30),
-                title: Text(
-                  labels[index].$1,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: _muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                subtitle: Text(labels[index].$3),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _navigate(index + 1),
-              ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: _muted,
+                  size: 23,
+                ),
+              ],
             ),
           ),
-        const SizedBox(height: 10),
+        ),
+      ),
+    );
+  }
+
+  Widget _dashboard() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(19, 9, 19, 24),
+      children: [
+        _sectionLabel('CENTRAL DE OPERAÇÕES'),
+        const SizedBox(height: 7),
+        Text(
+          'Olá, ' + (_user ?? 'Usuário'),
+          style: const TextStyle(
+            fontSize: 27,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 6),
         const Text(
-          'Esta versão consulta dados. Mapas, edição e comandos de voo '
-          'serão implementados em etapas posteriores.',
-          style: TextStyle(color: _muted, fontSize: 12),
+          'Seu campo. Sua frota. Tudo em um só lugar.',
+          style: TextStyle(color: _muted, fontSize: 13),
+        ),
+        const SizedBox(height: 18),
+        _photoBanner(
+          title: 'Agricultura conectada',
+          subtitle: 'Talhões, aeronaves e operações sob o mesmo controle.',
+          height: 184,
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            _sectionLabel('ACESSO RÁPIDO'),
+            const Spacer(),
+            const Text(
+              'SmartFarm Atlantic',
+              style: TextStyle(color: _muted, fontSize: 11),
+            ),
+          ],
+        ),
+        const SizedBox(height: 13),
+        _shortcut(
+          title: 'Gestão de talhões',
+          subtitle: 'Consulte áreas ou importe arquivos KML',
+          icon: Icons.map_outlined,
+          color: _accent,
+          onTap: () => _navigate(1),
+        ),
+        _shortcut(
+          title: 'Frota de drones',
+          subtitle: 'Visualize os equipamentos cadastrados',
+          icon: Icons.flight_outlined,
+          color: _positive,
+          onTap: () => _navigate(2),
+        ),
+        _shortcut(
+          title: 'Registros de operações',
+          subtitle: 'Acompanhe os dados de voo disponíveis',
+          icon: Icons.assignment_outlined,
+          color: const Color(0xFFC18A53),
+          onTap: () => _navigate(3),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _panel,
+            border: Border.all(color: _outline),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, size: 20, color: _accent),
+              SizedBox(width: 11),
+              Expanded(
+                child: Text(
+                  'Esta etapa oferece consultas de dados e prévia KML. '
+                  'Mapas georreferenciados, edição de talhões e comandos '
+                  'de voo serão integrados em etapas posteriores.',
+                  style: TextStyle(color: _muted, fontSize: 12, height: 1.5),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -431,18 +683,26 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 42),
-              const SizedBox(height: 12),
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              OutlinedButton(
-                onPressed: () => _loadRecords(_tab),
-                child: const Text('Tentar novamente'),
-              ),
-            ],
+          child: Container(
+            padding: const EdgeInsets.all(22),
+            decoration: _panelDecoration(borderColor: const Color(0xFF783B47)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 42,
+                  color: Color(0xFFFF6F78),
+                ),
+                const SizedBox(height: 12),
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: () => _loadRecords(_tab),
+                  child: const Text('Tentar novamente'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -450,39 +710,90 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
     return RefreshIndicator(
       onRefresh: () => _loadRecords(_tab),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(19, 12, 19, 28),
         children: [
+          _sectionLabel('SMARTFARM  /  EAVISION'),
+          const SizedBox(height: 7),
           Text(
             resource.label,
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           const Text(
-            'Consulta aos registros disponíveis na sua conta EAVision.',
-            style: TextStyle(color: _muted),
+            'Registros disponíveis na sua conta autenticada.',
+            style: TextStyle(color: _muted, fontSize: 13),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 15),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+            decoration: _panelDecoration(borderColor: _outline),
+            child: Row(
+              children: [
+                const Icon(Icons.layers_outlined, color: _accent),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Registros exibidos: ' + _records.length.toString(),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const Icon(Icons.verified_user_outlined,
+                    color: _positive, size: 19),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           if (_records.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 36),
-              child: Text(
-                'Nenhum registro retornado para esta conta.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: _muted),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+              decoration: _panelDecoration(),
+              child: const Column(
+                children: [
+                  Icon(Icons.folder_open_outlined, color: _muted, size: 45),
+                  SizedBox(height: 14),
+                  Text(
+                    'Nenhum registro retornado para esta conta.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: _muted),
+                  ),
+                ],
               ),
             ),
           for (final record in _records)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Card(
-                color: _card,
-                child: ListTile(
-                  title: Text(record.title),
-                  subtitle: record.subtitle == null
-                      ? null
-                      : Text(record.subtitle!),
-                  leading: const Icon(Icons.description_outlined, color: _accent),
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: _panelDecoration(),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 7,
                 ),
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: _accent.withValues(alpha: 0.13),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    resource == SmartFarmResource.devices
+                        ? Icons.flight_outlined
+                        : resource == SmartFarmResource.plots
+                        ? Icons.map_outlined
+                        : Icons.assignment_outlined,
+                    color: _accent,
+                  ),
+                ),
+                title: Text(
+                  record.title,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: record.subtitle == null
+                    ? null
+                    : Text(
+                        record.subtitle!,
+                        style: const TextStyle(color: _muted, fontSize: 12),
+                      ),
               ),
             ),
         ],
@@ -492,25 +803,67 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
 
   Widget _profile() {
     return ListView(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(19, 12, 19, 28),
       children: [
+        _sectionLabel('PREFERÊNCIAS E ACESSO'),
+        const SizedBox(height: 8),
         const Text(
           'Minha conta',
-          style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          color: _card,
-          child: ListTile(
-            leading: const Icon(Icons.verified_user_outlined, color: _accent),
-            title: Text(_user ?? 'Usuário'),
-            subtitle: const Text('Sessão SmartFarm Atlantic'),
-          ),
+          style: TextStyle(fontSize: 27, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 18),
+        Container(
+          decoration: _panelDecoration(),
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: _accent.withValues(alpha: 0.17),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Icon(
+                  Icons.person_outline,
+                  color: _accent,
+                  size: 29,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _user ?? 'Usuário',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      'Sessão SmartFarm Atlantic',
+                      style: TextStyle(color: _muted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.verified_user_outlined,
+                  color: _positive, size: 22),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
         OutlinedButton.icon(
           key: const Key('sign-out'),
           onPressed: _busy ? null : _logout,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _onAccent,
+            side: const BorderSide(color: _outline),
+            padding: const EdgeInsets.symmetric(vertical: 15),
+          ),
           icon: const Icon(Icons.logout),
           label: const Text('Sair da conta'),
         ),
