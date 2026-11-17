@@ -285,24 +285,24 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(15),
+              padding: const EdgeInsets.all(9),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _sectionLabel('ATLANTIC DRONES  /  SMART FARM',
                       color: _positive),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 5),
                   Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w800,
                       height: 1.15,
                       color: _onAccent,
                     ),
                   ),
-                  const SizedBox(height: 7),
+                  const SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: const TextStyle(
@@ -441,9 +441,13 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                     Icon(Icons.verified_user_outlined,
                         color: _positive, size: 15),
                     SizedBox(width: 7),
-                    Text(
-                      'Atlantic Drones • Acesso autenticado',
-                      style: TextStyle(color: _muted, fontSize: 11),
+                    Expanded(
+                      child: Text(
+                        'Atlantic Drones • Acesso autenticado',
+                        style: TextStyle(color: _muted, fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
