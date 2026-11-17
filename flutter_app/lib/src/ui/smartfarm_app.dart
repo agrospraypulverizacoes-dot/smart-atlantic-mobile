@@ -596,7 +596,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
         _sectionLabel('CENTRAL DE OPERAÇÕES'),
         const SizedBox(height: 7),
         Text(
-          'Olá, ' + (_user ?? 'Usuário'),
+          'Olá, ${_user ?? 'Usuário'}',
           style: const TextStyle(
             fontSize: 27,
             fontWeight: FontWeight.w800,
@@ -733,7 +733,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Registros exibidos: ' + _records.length.toString(),
+                    'Registros exibidos: ${_records.length}',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),

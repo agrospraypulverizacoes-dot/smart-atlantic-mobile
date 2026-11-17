@@ -65,7 +65,7 @@ class _KmlImportPageState extends State<KmlImportPage> {
           const Text('Gestão de talhões',
             style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('Importe arquivos KML para separar os contornos e 
+          const Text('Importe arquivos KML para separar os contornos e '
               'visualizar cada talhão com nome e coordenadas originais.'),
           const SizedBox(height: 16),
           FilledButton.icon(
