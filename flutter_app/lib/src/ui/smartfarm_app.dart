@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../data/smartfarm_api.dart';
 
 const _background = Color(0xFF07131C);
@@ -26,7 +26,7 @@ class _SmartFarmAppState extends State<SmartFarmApp> {
   @override
   void dispose() {
     if (widget.gateway == null && _gateway is SmartFarmApi) {
-      (_gateway as SmartFarmApi).dispose();
+      _gateway.dispose();
     }
     super.dispose();
   }
@@ -370,7 +370,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
       padding: const EdgeInsets.all(22),
       children: [
         Text(
-          'Olá, ' + (_user ?? 'Usuário'),
+          'Olá, ${_user ?? 'Usuário'}',
           style: const TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),

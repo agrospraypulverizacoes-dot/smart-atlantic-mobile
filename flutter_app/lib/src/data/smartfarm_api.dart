@@ -27,7 +27,7 @@ class SmartFarmRecord {
   String? get subtitle {
     for (final key in ['id', 'deviceSn', 'sn', 'fieldId']) {
       final value = fields[key]?.toString().trim();
-      if (value != null && value.isNotEmpty) return key + ': ' + value;
+      if (value != null && value.isNotEmpty) return '$key: $value';
     }
     return null;
   }
@@ -51,10 +51,9 @@ class SmartFarmApi implements SmartFarmGateway {
   SmartFarmApi({
     HttpClient? httpClient,
     Uri? baseUrl,
-    Duration timeout = const Duration(seconds: 15),
+    this._timeout = const Duration(seconds: 15),
   }) : _client = httpClient ?? HttpClient(),
-       _base = baseUrl ?? Uri.parse('https://smartfarm.atlanticdrones.com.br'),
-       _timeout = timeout;
+       _base = baseUrl ?? Uri.parse('https://smartfarm.atlanticdrones.com.br');
 
   static const sessionName = 'atlantic_smartfarm_session';
   final HttpClient _client;
@@ -82,7 +81,7 @@ class SmartFarmApi implements SmartFarmGateway {
       final response = await request.close().timeout(_timeout);
       for (final cookie in response.cookies) {
         if (cookie.name == sessionName) {
-          _cookie = cookie.maxAge == 0 ? null : cookie.name + '=' + cookie.value;
+          _cookie = cookie.maxAge == 0 ? null : '${cookie.name}=${cookie.value}';
         }
       }
       final payload = await utf8.decoder.bind(response).join().timeout(_timeout);
@@ -99,7 +98,7 @@ class SmartFarmApi implements SmartFarmGateway {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw SmartFarmApiException(
           (result['detail'] ?? result['message'] ??
-                  ('Erro HTTP ' + response.statusCode.toString()))
+                  ('Erro HTTP ${response.statusCode}'))
               .toString(),
         );
       }
@@ -159,7 +158,7 @@ class SmartFarmApi implements SmartFarmGateway {
     final request = <String, dynamic>{'pageIndex': 1, 'pageSize': 30};
     if (resource == SmartFarmResource.operations) request['searchType'] = 2;
     final response = await _request(
-      '/api/v1/eav/read/' + resource.path,
+      '/api/v1/eav/read/${resource.path}',
       body: request,
     );
     dynamic node = response['data'] ?? response;
