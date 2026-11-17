@@ -98,7 +98,7 @@ class SmartFarmApi implements SmartFarmGateway {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw SmartFarmApiException(
           (result['detail'] ?? result['message'] ??
-                  ('Erro HTTP ${response.statusCode}'))
+                  'Erro HTTP ${response.statusCode}')
               .toString(),
         );
       }
