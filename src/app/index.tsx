@@ -5,18 +5,30 @@ import {me,login,logout,list,type Resource} from '../lib/api';
 type Page='inicio'|Resource|'conta';
 const sections:[Page,string][]=[['inicio','Início'],['plots','Talhões'],['devices','Drones'],['operations','Operações'],['conta','Conta']];
 function extract(r:any):any[]{const x=r?.data??r;const y=x?.data??x;return [y?.records,y?.list,y?.rows,y?.items,x?.records,x?.list,y,x].find(Array.isArray)??[]}
+function accountDisplayName(session:any):string {
+ const profile=session?.user?.data??{};
+ const context=session?.context??{};
+ const candidates=[
+  profile.accountName,profile.account?.accountName,profile.account?.name,
+  profile.nickName,profile.nickname,profile.realName,profile.fullName,profile.name,
+  context.accountName,context.nickName,context.nickname,context.realName,context.name,
+  session?.username,
+ ];
+ const value=candidates.find((candidate:unknown)=>typeof candidate==='string'&&candidate.trim().length>0&&!candidate.includes('@'));
+ return typeof value==='string'?value.trim():'Usuário';
+}
 export default function Home(){
- const [user,setUser]=useState<string|null>(null),[name,setName]=useState(''),[password,setPassword]=useState(''),[page,setPage]=useState<Page>('inicio'),[rows,setRows]=useState<any[]>([]),[busy,setBusy]=useState(false),[boot,setBoot]=useState(true),[error,setError]=useState('');
- useEffect(()=>{me().then(r=>{if(r.ok)setUser(r.username??'Usuário')}).catch(()=>{}).finally(()=>setBoot(false))},[]);
- async function enter(){setBusy(true);setError('');try{await login(name.trim(),password);const r=await me();if(!r.ok)throw Error('Sessão não validada');setUser(r.username??name);setPassword('')}catch(e){setError(String(e instanceof Error?e.message:e))}finally{setBusy(false)}}
+ const [user,setUser]=useState<string|null>(null),[accountName,setAccountName]=useState('Usuário'),[name,setName]=useState(''),[password,setPassword]=useState(''),[page,setPage]=useState<Page>('inicio'),[rows,setRows]=useState<any[]>([]),[busy,setBusy]=useState(false),[boot,setBoot]=useState(true),[error,setError]=useState('');
+ useEffect(()=>{me().then(r=>{if(r.ok){setUser(r.username??'Usuário');setAccountName(accountDisplayName(r))}}).catch(()=>{}).finally(()=>setBoot(false))},[]);
+ async function enter(){setBusy(true);setError('');try{await login(name.trim(),password);const r=await me();if(!r.ok)throw Error('Sessão não validada');setUser(r.username??name);setAccountName(accountDisplayName(r));setPassword('')}catch(e){setError(String(e instanceof Error?e.message:e))}finally{setBusy(false)}}
  async function open(p:Page){setPage(p);setRows([]);setError('');if(p==='inicio'||p==='conta')return;setBusy(true);try{setRows(extract(await list(p)))}catch(e){setError(String(e instanceof Error?e.message:e))}finally{setBusy(false)}}
- async function leave(){setBusy(true);try{await logout()}catch{}setUser(null);setPage('inicio');setRows([]);setBusy(false)}
+ async function leave(){setBusy(true);try{await logout()}catch{}setUser(null);setAccountName('Usuário');setPage('inicio');setRows([]);setBusy(false)}
  const button=(label:string,fn:()=>void)=><Pressable style={s.button} onPress={fn} disabled={busy}><Text style={s.buttonText}>{label}</Text></Pressable>;
  return <SafeAreaView style={s.root}><View style={s.header}><Text style={s.brand}>ATLANTIC <Text style={s.green}>SMARTFARM</Text></Text></View>
  {boot?<ActivityIndicator color="#67C23A" style={{marginTop:90}}/>:!user?<ScrollView contentContainerStyle={s.body}>
  <Text style={s.kicker}>SMARTFARM MOBILE</Text><Text style={s.title}>Gestão agrícola em suas mãos.</Text><Text style={s.sub}>Acesse com sua conta EAVision.</Text>
  <View style={s.card}><Text style={s.label}>Usuário</Text><TextInput value={name} onChangeText={setName} autoCapitalize="none" style={s.input} placeholderTextColor="#8BA1AA" placeholder="Login"/><Text style={s.label}>Senha</Text><TextInput secureTextEntry value={password} onChangeText={setPassword} style={s.input} placeholder="Senha" placeholderTextColor="#8BA1AA"/>{button(busy?'Entrando...':'Entrar no SmartFarm',enter)}</View>{!!error&&<Text style={s.error}>{error}</Text>}
- </ScrollView>:<><ScrollView contentContainerStyle={s.body}><Text style={s.kicker}>SMARTFARM ATLANTIC</Text><Text style={s.title}>{page==='inicio'?'Olá, '+user:sections.find(x=>x[0]===page)?.[1]}</Text>
+ </ScrollView>:<><ScrollView contentContainerStyle={s.body}><Text style={s.kicker}>SMARTFARM ATLANTIC</Text><Text style={s.title}>{page==='inicio'?'Olá, '+accountName:sections.find(x=>x[0]===page)?.[1]}</Text>
  {page==='inicio'&&<><Text style={s.sub}>Gerencie os dados de sua operação agrícola.</Text>{sections.filter(x=>x[0]!=='inicio'&&x[0]!=='conta').map(x=><Pressable key={x[0]} style={s.card} onPress={()=>open(x[0])}><Text style={s.cardTitle}>{x[1]} ›</Text><Text style={s.sub}>Consultar dados da EAVision</Text></Pressable>)}</>}
  {page==='conta'&&<View style={s.card}><Text style={s.cardTitle}>Sessão conectada</Text><Text style={s.sub}>{user}</Text>{button('Sair da conta',leave)}</View>}
  {page!=='inicio'&&page!=='conta'&&<>{button('Atualizar',()=>open(page))}{busy&&<ActivityIndicator color="#67C23A"/>}{!!error&&<Text style={s.error}>{error}</Text>}{!busy&&!error&&rows.length===0&&<Text style={s.sub}>Nenhum registro retornado para esta conta.</Text>}{rows.map((r,i)=><View key={String(r.id??i)} style={s.card}><Text style={s.cardTitle}>{r.name??r.fieldName??r.uavName??r.taskName??'Registro '+(i+1)}</Text><Text style={s.sub}>{r.id!==undefined?'ID: '+r.id:'Dados recebidos do SmartFarm'}</Text></View>)}</>}
