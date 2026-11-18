@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -92,7 +93,7 @@ SmartFarmPage parseSmartFarmPage(
   if (status != null && status.toString() != '200') {
     throw SmartFarmApiException(
       (response['message'] ?? response['detail'] ??
-       ('Consulta EAVision recusada (status ' + status.toString() + ')')).toString(),
+       ('Consulta EAVision recusada (status ${status)')).toString(),
     );
   }
   final containers = <Map<dynamic, dynamic>>[];
@@ -155,7 +156,7 @@ abstract class SmartFarmGateway {
   Future<List<SmartFarmRecord>> records(SmartFarmResource resource);
   // Implementações de teste anteriores continuam válidas.
   Future<SmartFarmPage> recordsPage(
-    SmartFarmResource resource, {int pageIndex = 1, int pageSize = 50},
+    SmartFarmResource resource, {int pageIndex = 1, int pageSize = 50}
   ) async {
     final items = await records(resource);
     return SmartFarmPage(
@@ -288,7 +289,7 @@ class SmartFarmApi implements SmartFarmGateway {
 
   @override
   Future<SmartFarmPage> recordsPage(
-    SmartFarmResource resource, {int pageIndex = 1, int pageSize = 50},
+    SmartFarmResource resource, {int pageIndex = 1, int pageSize = 50}
   ) => modulePage(
     switch (resource) {
       SmartFarmResource.plots => SmartFarmModule.plots,
