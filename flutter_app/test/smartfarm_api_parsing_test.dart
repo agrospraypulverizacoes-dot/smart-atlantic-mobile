@@ -2,6 +2,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:smartfarm_mobile/src/data/smartfarm_api.dart';
 
 void main() {
+  test('prioriza o nome da conta EAVision sobre o e-mail de login', () {
+    expect(
+      smartFarmAccountDisplayName({
+        'username': 'contato@atlanticdrones.com.br',
+        'user': {
+          'data': {'accountName': 'Atlantic Drones'},
+        },
+      }),
+      'Atlantic Drones',
+    );
+    expect(
+      smartFarmAccountDisplayName({
+        'username': 'contato@atlanticdrones.com.br',
+      }),
+      'Usuário',
+    );
+    expect(
+      smartFarmAccountDisplayName({
+        'username': 'operador',
+        'context': {'name': 'Atlantic Drones'},
+      }),
+      'Atlantic Drones',
+    );
+  });
+
   group('Contrato SmartFarm/EAVision', () {
     test('reconhece data.content e totalElements', () {
       final result = parseSmartFarmPage(
