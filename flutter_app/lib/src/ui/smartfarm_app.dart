@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import '../data/smartfarm_api.dart';
 import '../plots/kml_import_page.dart';
+import 'web_modules_page.dart';
 
 // Atlantic Smart Farm design tokens — fonte: RAG SMARTFARM/app/static/atlantic-theme.css.
 const _background = Color(0xFF071019);
@@ -108,6 +109,10 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
   bool _booting = true;
   bool _busy = false;
   List<SmartFarmRecord> _records = const [];
+  int _recordsPage = 0;
+  bool _recordsHasMore = false;
+  bool _loadingMore = false;
+  int _recordsVersion = 0;
 
   @override
   void initState() {
@@ -163,29 +168,52 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
   }
 
   void _navigate(int index) {
+    _recordsVersion++;
     setState(() {
       _tab = index;
       _error = null;
       _records = const [];
+      _recordsPage = 0;
+      _recordsHasMore = false;
+      _loadingMore = false;
     });
     if (index >= 1 && index <= 3) _loadRecords(index);
   }
 
-  Future<void> _loadRecords(int index) async {
+  Future<void> _loadRecords(int index, {bool loadMore = false}) async {
+    if (loadMore && (_loadingMore || !_recordsHasMore)) return;
+    final version = ++_recordsVersion;
     final resource = SmartFarmResource.values[index - 1];
+    final page = loadMore ? _recordsPage + 1 : 1;
     setState(() {
-      _busy = true;
-      _error = null;
+      if (loadMore) {
+        _loadingMore = true;
+      } else {
+        _busy = true;
+        _error = null;
+      }
     });
     try {
-      final records = await widget.gateway.records(resource);
-      if (!mounted || _tab != index) return;
-      setState(() => _records = records);
+      final result = await widget.gateway.recordsPage(
+        resource, pageIndex: page, pageSize: 50,
+      );
+      if (!mounted || _tab != index || version != _recordsVersion) return;
+      setState(() {
+        _records = loadMore
+            ? [..._records, ...result.records] : result.records;
+        _recordsPage = result.pageIndex;
+        _recordsHasMore = result.hasMore;
+      });
     } catch (error) {
-      if (!mounted || _tab != index) return;
+      if (!mounted || _tab != index || version != _recordsVersion) return;
       setState(() => _error = error.toString());
     } finally {
-      if (mounted && _tab == index) setState(() => _busy = false);
+      if (mounted && _tab == index && version == _recordsVersion) {
+        setState(() {
+          _busy = false;
+          _loadingMore = false;
+        });
+      }
     }
   }
 
@@ -465,6 +493,16 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
         title: _logo(width: 206),
         toolbarHeight: 68,
         actions: [
+          IconButton(
+            key: const Key('open-web-modules'),
+            tooltip: 'Módulos do SmartFarm Web',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => SmartFarmWebModulesPage(gateway: widget.gateway),
+              ),
+            ),
+            icon: const Icon(Icons.apps_rounded),
+          ),
           if (_tab == 1)
             IconButton(
               key: const Key('import-kml'),
@@ -652,6 +690,18 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
           onTap: () => _navigate(3),
         ),
         const SizedBox(height: 6),
+        _shortcut(
+          title: 'Módulos do SmartFarm Web',
+          subtitle: 'Mapas, modelos, demandas, histórico e configurações',
+          icon: Icons.apps_rounded,
+          color: _accent,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => SmartFarmWebModulesPage(gateway: widget.gateway),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -801,6 +851,20 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                       ),
               ),
             ),
+          if (_recordsHasMore)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: OutlinedButton.icon(
+                key: const Key('records-load-more'),
+                onPressed: _loadingMore ? null :
+                    () => _loadRecords(_tab, loadMore: true),
+                icon: const Icon(Icons.expand_more),
+                label: Text(
+                  _loadingMore ? 'Carregando...' : 'Carregar mais registros',
+                ),
+              ),
+            ),
+
         ],
       ),
     );
