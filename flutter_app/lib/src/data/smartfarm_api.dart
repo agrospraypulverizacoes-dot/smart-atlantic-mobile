@@ -93,7 +93,7 @@ SmartFarmPage parseSmartFarmPage(
   if (status != null && status.toString() != '200') {
     throw SmartFarmApiException(
       (response['message'] ?? response['detail'] ??
-       ('Consulta EAVision recusada (status ${status)')).toString(),
+       ('Consulta EAVision recusada (status ' + status.toString() + ')')).toString(),
     );
   }
   final containers = <Map<dynamic, dynamic>>[];
