@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:smartfarm_mobile/src/data/smartfarm_api.dart';
 import 'package:smartfarm_mobile/src/ui/smartfarm_app.dart';
 
-class FakeGateway implements SmartFarmGateway {
+class FakeGateway extends SmartFarmGateway {
   String? user;
   int plotRequests = 0;
 
