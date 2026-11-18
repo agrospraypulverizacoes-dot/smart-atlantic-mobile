@@ -153,6 +153,39 @@ class SmartFarmApiException implements Exception {
   String toString() => message;
 }
 
+/// Nome exibido no aplicativo; o login pode continuar sendo um e-mail.
+String smartFarmAccountDisplayName(Map<String, dynamic> session) {
+  final candidates = <dynamic>[];
+  void collect(dynamic data) {
+    if (data is! Map) return;
+    for (final key in [
+      'accountName', 'nickName', 'nickname', 'realName', 'fullName', 'name',
+      'username',
+    ]) {
+      candidates.add(data[key]);
+    }
+    final account = data['account'];
+    if (account is Map) {
+      candidates.add(account['accountName']);
+      candidates.add(account['name']);
+    }
+  }
+
+  final user = session['user'];
+  if (user is Map) {
+    collect(user['data']);
+    collect(user);
+  }
+  collect(session['context']);
+  candidates.add(session['username']);
+  for (final candidate in candidates) {
+    if (candidate is! String) continue;
+    final value = candidate.trim();
+    if (value.isNotEmpty && !value.contains('@')) return value;
+  }
+  return 'Usuário';
+}
+
 abstract class SmartFarmGateway {
   Future<String?> currentUser();
   Future<String> signIn(String username, String password);
@@ -251,7 +284,7 @@ class SmartFarmApi implements SmartFarmGateway {
     if (_cookie == null) return null;
     final response = await _request('/api/v1/auth/me');
     if (response['ok'] != true) return null;
-    return (response['username'] ?? response['user'] ?? 'Usuário').toString();
+    return smartFarmAccountDisplayName(response);
   }
 
   @override
