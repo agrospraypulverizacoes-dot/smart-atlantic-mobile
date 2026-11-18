@@ -1,6 +1,6 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings
 import 'dart:math' as math;
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../data/smartfarm_api.dart';

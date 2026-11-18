@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings
 import 'package:material_ui/material_ui.dart';
 import '../data/smartfarm_api.dart';
 import '../plots/kml_import_page.dart';

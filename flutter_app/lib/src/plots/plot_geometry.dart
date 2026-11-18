@@ -1,5 +1,7 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings, curly_braces_in_flow_control_structures
 import 'dart:convert';
 import 'package:latlong2/latlong.dart';
+import 'package:flutter_map/flutter_map.dart';
 
 /// Geometrias MapCloud/EAVision, sem modificar coordenadas cadastradas.
 class PlotGeometry {

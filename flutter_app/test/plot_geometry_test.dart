@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smartfarm_mobile/src/plots/plot_geometry.dart';
 import 'package:smartfarm_mobile/src/data/smartfarm_api.dart';
