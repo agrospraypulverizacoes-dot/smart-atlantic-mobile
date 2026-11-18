@@ -300,7 +300,10 @@ class SmartFarmApi implements SmartFarmGateway {
       SmartFarmResource.devices => SmartFarmModule.devices,
       SmartFarmResource.operations => SmartFarmModule.operations,
     },
-    pageIndex: pageIndex, pageSize: pageSize,
+    pageIndex: pageIndex,
+    // A interface MapCloud carrega todos os talhões de uma vez para
+    // permitir pesquisa local sem omitir registros.
+    pageSize: resource == SmartFarmResource.plots ? 10000 : pageSize,
   );
 
   @override
@@ -309,7 +312,11 @@ class SmartFarmApi implements SmartFarmGateway {
     int pageIndex = 1, int pageSize = 50, String filter = '',
     DateTime? from, DateTime? to,
   }) async {
-    if (pageIndex < 1 || pageSize < 1 || pageSize > 100) {
+    if (module == SmartFarmModule.plots) {
+      pageSize = 10000;
+    }
+    if (pageIndex < 1 || pageSize < 1 ||
+        pageSize > (module == SmartFarmModule.plots ? 10000 : 100)) {
       throw const SmartFarmApiException('Paginação inválida.');
     }
     final body = <String, dynamic>{
@@ -398,7 +405,14 @@ class SmartFarmApi implements SmartFarmGateway {
       );
     }
     final data = result['data'];
-    if (data is Map) return {...fields, ...Map<String, dynamic>.from(data)};
+    if (data is Map) {
+      final additions = Map<String, dynamic>.from(data);
+      // O detalhe pode retornar campos nulos que constam completos
+      // na listagem do MapCloud; não descartar geometria existente.
+      additions.removeWhere((key, value) => value == null ||
+          (value is String && value.trim().isEmpty));
+      return {...fields, ...additions};
+    }
     return {...fields, '_detail': data};
   }
 

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
 
 import '../data/smartfarm_api.dart';
+import '../plots/smartfarm_plot_map_page.dart';
 
 const _bg = Color(0xFF071019);
 const _panel = Color(0xFF0E1A2A);
@@ -408,11 +409,16 @@ class _SmartFarmModuleRecordsPageState extends State<SmartFarmModuleRecordsPage>
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => SmartFarmRecordDetailPage(
-                        gateway: widget.gateway,
-                        module: module,
-                        record: record,
-                      ),
+                      builder: (_) => module == SmartFarmModule.plots
+                          ? SmartFarmPlotMapPage(
+                              gateway: widget.gateway,
+                              record: record,
+                            )
+                          : SmartFarmRecordDetailPage(
+                              gateway: widget.gateway,
+                              module: module,
+                              record: record,
+                            ),
                     ),
                   ),
                 ),

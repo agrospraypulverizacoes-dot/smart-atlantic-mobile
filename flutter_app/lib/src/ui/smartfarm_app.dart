@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import '../data/smartfarm_api.dart';
 import '../plots/kml_import_page.dart';
+import '../plots/smartfarm_plot_map_page.dart';
+import '../plots/plot_geometry.dart';
 import 'web_modules_page.dart';
 
 // Atlantic Smart Farm design tokens — fonte: RAG SMARTFARM/app/static/atlantic-theme.css.
@@ -113,6 +115,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
   bool _recordsHasMore = false;
   bool _loadingMore = false;
   int _recordsVersion = 0;
+  String _plotQuery = '';
 
   @override
   void initState() {
@@ -731,6 +734,19 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
 
   Widget _recordsScreen() {
     final resource = SmartFarmResource.values[_tab - 1];
+    final visible = resource != SmartFarmResource.plots ||
+        _plotQuery.trim().isEmpty
+        ? _records
+        : _records.where((record) {
+            final fields = record.fields;
+            final combined = [
+              PlotDisplay.name(fields),
+              PlotDisplay.id(fields),
+              PlotDisplay.requirement(fields),
+              PlotDisplay.location(fields),
+            ].join(' ').toLowerCase();
+            return combined.contains(_plotQuery.toLowerCase().trim());
+          }).toList(growable: false);
     if (_busy) {
       return const Center(child: CircularProgressIndicator(color: _accent));
     }
@@ -779,6 +795,17 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
             style: TextStyle(color: _muted, fontSize: 13),
           ),
           const SizedBox(height: 15),
+          if (resource == SmartFarmResource.plots) ...[
+            TextField(
+              key: const Key('plot-search'),
+              decoration: const InputDecoration(
+                labelText: 'Buscar nome ou ID do talhão',
+                prefixIcon: Icon(Icons.search_outlined),
+              ),
+              onChanged: (value) => setState(() => _plotQuery = value),
+            ),
+            const SizedBox(height: 13),
+          ],
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
             decoration: _panelDecoration(borderColor: _outline),
@@ -788,7 +815,10 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Registros exibidos: ${_records.length}',
+                    resource == SmartFarmResource.plots
+                        ? 'Talhões: ' + visible.length.toString() +
+                          (_plotQuery.isEmpty ? '' : ' de ' + _records.length.toString())
+                        : 'Registros exibidos: ' + _records.length.toString(),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -798,7 +828,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
             ),
           ),
           const SizedBox(height: 14),
-          if (_records.isEmpty)
+          if (visible.isEmpty)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
               decoration: _panelDecoration(),
@@ -814,8 +844,21 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                 ],
               ),
             ),
-          for (final record in _records)
-            Container(
+          for (final record in visible)
+            if (resource == SmartFarmResource.plots)
+              SmartFarmPlotCard(
+                record: record,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => SmartFarmPlotMapPage(
+                      gateway: widget.gateway,
+                      record: record,
+                    ),
+                  ),
+                ),
+              )
+            else
+              Container(
               margin: const EdgeInsets.only(bottom: 10),
               decoration: _panelDecoration(),
               child: ListTile(
