@@ -18,7 +18,11 @@ class SmartFarmRecord {
   final Map<String, dynamic> fields;
 
   String get title {
-    for (final key in ['name', 'fieldName', 'uavName', 'taskName', 'plotName']) {
+    for (final key in [
+      'name', 'fieldName', 'mapName', 'templateName', 'uavName',
+      'taskName', 'plotName', 'uavAlias', 'date', 'taskCode',
+      'cropName', 'title', 'accountName',
+    ]) {
       final value = fields[key]?.toString().trim();
       if (value != null && value.isNotEmpty) return value;
     }
