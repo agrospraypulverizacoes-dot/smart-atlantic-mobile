@@ -8,6 +8,8 @@ class FakeGateway extends SmartFarmGateway {
   String? user;
   int plotRequests = 0;
   int deviceStatsRequests = 0;
+  final Map<String, String> nicknames = {};
+  int nicknameSaveCalls = 0;
 
   @override
   Future<String?> currentUser() async => user;
@@ -41,6 +43,15 @@ class FakeGateway extends SmartFarmGateway {
   }
 
   @override
+  Future<Map<String, String>> deviceNicknames() async => {...nicknames};
+
+  @override
+  Future<void> saveDeviceNickname(String alias, String name) async {
+    nicknameSaveCalls++;
+    nicknames[alias] = name;
+  }
+
+  @override
   Future<Map<String, dynamic>> moduleDetail(
     SmartFarmModule module, SmartFarmRecord record,
   ) async {
@@ -58,6 +69,37 @@ class FakeGateway extends SmartFarmGateway {
 }
 
 void main() {
+  testWidgets('detalhes do drone e edição de apelido persistente', (tester) async {
+    final gateway = FakeGateway()..user = 'piloto';
+    await tester.pumpWidget(SmartFarmApp(gateway: gateway));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nav-devices')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('device-card-AT-DRONE-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detalhes do Dispositivo'), findsOneWidget);
+    expect(find.text('Código da aeronave'), findsOneWidget);
+    expect(find.text('Código do dispositivo'), findsOneWidget);
+    expect(find.text('Código do produto'), findsOneWidget);
+    expect(find.byKey(const Key('device-nickname-edit')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('device-nickname-edit')));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(const Key('device-nickname-input'));
+    await tester.ensureVisible(input);
+    await tester.enterText(input, 'Operação 01');
+    await tester.ensureVisible(find.byKey(const Key('device-nickname-save')));
+    await tester.tap(find.byKey(const Key('device-nickname-save')));
+    await tester.pumpAndSettle();
+
+    expect(gateway.nicknameSaveCalls, 1);
+    expect(gateway.nicknames['AT-DRONE-1'], 'Operação 01');
+    await tester.tap(find.byTooltip('Fechar detalhes'));
+    await tester.pumpAndSettle();
+    expect(find.text('Operação 01'), findsOneWidget);
+  });
+
   testWidgets('mapa do talhão alterna tela cheia e detalhes', (tester) async {
     final record = SmartFarmRecord({
       'fieldId': 25,
