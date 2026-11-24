@@ -38,24 +38,27 @@ class SmartFarmDeviceMetrics {
   }
 
   factory SmartFarmDeviceMetrics.fromDetails(Map<String, dynamic>? details) {
-    final confirmed = details?['_confirmed'] == true;
     final workArea = _number(details?['workArea']);
     final directHours = _number(
-      details?['flightHours'] ?? details?['flightHour'] ?? details?['flyHours'],
+      details?['flightHours'] ??
+          details?['flightHour'] ??
+          details?['flyHours'],
     );
-    final flightSeconds = _number(
+    final seconds = _number(
       details?['flightTime'] ?? details?['totalFlightTime'],
     );
+    // Um campo de horas nulo/zero não deve ocultar uma duração
+    // positiva fornecida explicitamente em segundos pela API.
+    final hours = (directHours != null && directHours > 0)
+        ? directHours
+        : (seconds != null && seconds > 0)
+            ? seconds / 3600
+            : directHours ?? (seconds == null ? null : seconds / 3600);
     return SmartFarmDeviceMetrics(
       // EAVision armazena workArea em mu: 15 mu correspondem a 1 ha.
-      areaHa: workArea == null
-          ? (confirmed ? '0,00' : '—')
-          : _format(workArea / 15),
-      flightHours: directHours != null
-          ? _format(directHours, stripZeros: true)
-          : flightSeconds != null
-              ? _format(flightSeconds / 3600, stripZeros: true)
-              : (confirmed ? '0' : '—'),
+      areaHa: workArea == null ? '—' : _format(workArea / 15),
+      // "—" indica ausência do campo, diferente de zero confirmado.
+      flightHours: hours == null ? '—' : _format(hours, stripZeros: true),
     );
   }
 }
@@ -256,6 +259,11 @@ abstract class SmartFarmGateway {
   Future<Map<String, dynamic>> moduleDetail(
     SmartFarmModule module, SmartFarmRecord record,
   ) async => record.fields;
+  /// Apelidos são salvos no SmartFarm e compartilhados com o Web.
+  Future<Map<String, String>> deviceNicknames() async => const {};
+  Future<void> saveDeviceNickname(String uavAlias, String nickname) async {
+    throw const SmartFarmApiException('Edição não disponível neste ambiente.');
+  }
 }
 
 class SmartFarmApi implements SmartFarmGateway {
@@ -443,6 +451,37 @@ class SmartFarmApi implements SmartFarmGateway {
       response, pageIndex: pageIndex, pageSize: pageSize,
       paged: module.paged,
     );
+  }
+
+  @override
+  Future<Map<String, String>> deviceNicknames() async {
+    final response = await _request('/api/v1/devices/nicknames');
+    final raw = response['names'];
+    if (raw is! Map) return {};
+    return {
+      for (final entry in raw.entries)
+        if (entry.key.toString().trim().isNotEmpty)
+          entry.key.toString(): (entry.value ?? '').toString().trim(),
+    };
+  }
+
+  @override
+  Future<void> saveDeviceNickname(String uavAlias, String nickname) async {
+    final alias = uavAlias.trim();
+    final name = nickname.trim();
+    if (alias.isEmpty || alias.length > 100 || name.length > 90) {
+      throw const SmartFarmApiException('Identificação ou apelido inválido.');
+    }
+    final response = await _request(
+      '/api/v1/devices/nicknames',
+      body: {'uavAlias': alias, 'nickname': name},
+    );
+    if (response['ok'] == false) {
+      throw SmartFarmApiException(
+        (response['detail'] ?? response['message'] ??
+          'Não foi possível salvar o apelido.').toString(),
+      );
+    }
   }
 
   @override
