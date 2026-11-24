@@ -2,6 +2,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:smartfarm_mobile/src/data/smartfarm_api.dart';
 
 void main() {
+  test('horas ausentes não são exibidas como zero confirmado', () {
+    final missing = SmartFarmDeviceMetrics.fromDetails({
+      '_confirmed': true, 'workArea': 0,
+    });
+    expect(missing.areaHa, '0,00');
+    expect(missing.flightHours, '—');
+    final zero = SmartFarmDeviceMetrics.fromDetails({
+      'flightHours': 0,
+    });
+    expect(zero.flightHours, '0');
+  });
+
+  test('horas zeradas não ocultam duração positiva em segundos', () {
+    final metrics = SmartFarmDeviceMetrics.fromDetails({
+      'flightHours': 0,
+      'flightTime': 7200,
+    });
+    expect(metrics.flightHours, '2');
+  });
+
   test('converte área em mu para hectares e segundos para horas', () {
     final metrics = SmartFarmDeviceMetrics.fromDetails({
       'workArea': 2.55,
@@ -26,7 +46,7 @@ void main() {
     expect(missing.flightHours, '—');
     final empty = SmartFarmDeviceMetrics.fromDetails({'_confirmed': true});
     expect(empty.areaHa, '0,00');
-    expect(empty.flightHours, '0');
+    expect(empty.flightHours, '—');
   });
 
   test('prioriza o nome da conta EAVision sobre o e-mail de login', () {
