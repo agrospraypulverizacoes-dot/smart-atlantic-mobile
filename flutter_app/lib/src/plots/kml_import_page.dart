@@ -4,9 +4,11 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'kml_parser.dart';
+import '../data/smartfarm_api.dart';
 
 class KmlImportPage extends StatefulWidget {
-  const KmlImportPage({super.key});
+  const KmlImportPage({super.key, this.gateway});
+  final SmartFarmGateway? gateway;
   @override
   State<KmlImportPage> createState() => _KmlImportPageState();
 }
@@ -16,6 +18,58 @@ class _KmlImportPageState extends State<KmlImportPage> {
   bool _loading = false;
   String? _error;
   int _selection = 0;
+  List<int>? _bytes;
+  String? _fileName;
+  List<Map<String, dynamic>> _demands = const [];
+  int? _demandId;
+  bool _uploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.gateway != null) _loadDemands();
+  }
+
+  Future<void> _loadDemands() async {
+    try {
+      final list = await widget.gateway!.plotDemands();
+      if (mounted) setState(() => _demands = list);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _upload() async {
+    if (_bytes == null || _fileName == null || _demandId == null ||
+        widget.gateway == null || _uploading) return;
+    final approve = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Criar talhões na EAVision?'),
+        content: Text('Arquivo: ' + _fileName! +
+          '\nDemanda ID: ' + _demandId.toString() +
+          '\n\nConfirme os contornos antes de criar os registros.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Importar agora')),
+        ],
+      ),
+    );
+    if (approve != true || !mounted) return;
+    setState(() { _uploading = true; _error = null; });
+    try {
+      await widget.gateway!.importPlotKml(
+        requirementId: _demandId!, fileName: _fileName!, bytes: _bytes!,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
 
   Future<void> _chooseKml() async {
     if (_loading) return;
@@ -36,7 +90,9 @@ class _KmlImportPageState extends State<KmlImportPage> {
           if (data.lengthInBytes > 5 * 1024 * 1024) {
             throw const FormatException('KML maior que 5 MB.');
           }
-          found.addAll(readKmlPlots(utf8.decode(data), file.name));
+          final parsed = readKmlPlots(utf8.decode(data), file.name);
+          found.addAll(parsed);
+          if (parsed.isNotEmpty) { _bytes = data; _fileName = file.name; }
         } catch (error) {
           failures.add([file.name, error.toString()].join(': '));
         }
@@ -115,9 +171,37 @@ class _KmlImportPageState extends State<KmlImportPage> {
             ),
           ],
           const SizedBox(height: 12),
-          const Text('Importação apenas nesta sessão, sem upload ao servidor. '
-            'Persistência e mapa georreferenciado são etapas futuras.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF9EAFC3))),
+          if (widget.gateway != null) ...[
+            DropdownButtonFormField<int>(
+              key: const Key('kml-demand'),
+              initialValue: _demandId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Demanda de destino'),
+              items: [
+                for (final d in _demands)
+                  if (int.tryParse(d['requirementId'].toString()) != null)
+                    DropdownMenuItem(
+                      value: int.parse(d['requirementId'].toString()),
+                      child: Text((d['requirementName'] ?? 'Demanda').toString(),
+                        overflow: TextOverflow.ellipsis),
+                    ),
+              ],
+              onChanged: (id) => setState(() => _demandId = id),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const Key('kml-upload'),
+              onPressed: (_bytes == null || _demandId == null || _uploading)
+                  ? null : _upload,
+              icon: const Icon(Icons.cloud_upload_outlined),
+              label: Text(_uploading ? 'Enviando...' : 'Importar na EAVision'),
+            ),
+            const SizedBox(height: 10),
+            const Text('Os talhões serão criados apenas após confirmação.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF9EAFC3))),
+          ] else
+            const Text('Prévia local. Conecte a conta para importar.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF9EAFC3))),
         ],
       ),
     );
