@@ -624,12 +624,17 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
           if (_tab == 1)
             IconButton(
               key: const Key('import-kml'),
-              tooltip: 'Importar KML',
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const KmlImportPage(),
-                ),
-              ),
+              tooltip: 'Criar talhão pelo KML',
+              onPressed: () async {
+                final result = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute<bool>(
+                    builder: (_) => KmlImportPage(gateway: widget.gateway),
+                  ),
+                );
+                if (result == true && mounted && _tab == 1) {
+                  _loadRecords(1);
+                }
+              },
               icon: const Icon(Icons.upload_file_outlined),
             ),
           if (_tab >= 1 && _tab <= 3)
@@ -1129,14 +1134,17 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                     PlotDisplay.id(record.fields)),
                 onFavorite: () => _togglePlotFavorite(
                     PlotDisplay.id(record.fields)),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => SmartFarmPlotMapPage(
-                      gateway: widget.gateway,
-                      record: record,
+                onTap: () async {
+                  await Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => SmartFarmPlotMapPage(
+                        gateway: widget.gateway,
+                        record: record,
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                  if (mounted && _tab == 1) _loadRecords(1);
+                },
               )
             else if (resource == SmartFarmResource.devices)
               _deviceCard(record)
