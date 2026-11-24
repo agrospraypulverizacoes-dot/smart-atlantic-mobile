@@ -1,4 +1,5 @@
 // ignore_for_file: prefer_interpolation_to_compose_strings
+import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import '../data/smartfarm_api.dart';
 import '../plots/kml_import_page.dart';
@@ -112,6 +113,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
   bool _booting = true;
   bool _busy = false;
   List<SmartFarmRecord> _records = const [];
+  final Map<String, Map<String, dynamic>> _deviceStats = {};
   int _recordsPage = 0;
   bool _recordsHasMore = false;
   bool _loadingMore = false;
@@ -177,6 +179,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
       _tab = index;
       _error = null;
       _records = const [];
+      _deviceStats.clear();
       _recordsPage = 0;
       _recordsHasMore = false;
       _loadingMore = false;
@@ -195,6 +198,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
       } else {
         _busy = true;
         _error = null;
+        if (resource == SmartFarmResource.devices) _deviceStats.clear();
       }
     });
     try {
@@ -208,6 +212,9 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
         _recordsPage = result.pageIndex;
         _recordsHasMore = result.hasMore;
       });
+      if (resource == SmartFarmResource.devices) {
+        unawaited(_loadDeviceStats(result.records, version, index));
+      }
     } catch (error) {
       if (!mounted || _tab != index || version != _recordsVersion) return;
       setState(() => _error = error.toString());
@@ -218,6 +225,29 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
           _loadingMore = false;
         });
       }
+    }
+  }
+
+  /// Consulta as estatísticas em lotes para não bloquear a lista de drones.
+  Future<void> _loadDeviceStats(
+    List<SmartFarmRecord> records, int version, int index,
+  ) async {
+    for (var offset = 0; offset < records.length; offset += 4) {
+      if (!mounted || _tab != index || version != _recordsVersion) return;
+      final batch = records.skip(offset).take(4);
+      await Future.wait(batch.map((record) async {
+        final alias = (record.fields['uavAlias'] ?? '').toString().trim();
+        if (alias.isEmpty) return;
+        try {
+          final data = await widget.gateway.moduleDetail(
+            SmartFarmModule.devices, record,
+          );
+          if (!mounted || _tab != index || version != _recordsVersion) return;
+          setState(() => _deviceStats[alias] = data);
+        } catch (_) {
+          // A lista permanece utilizável se alguma estatística falhar.
+        }
+      }));
     }
   }
 
@@ -235,6 +265,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
           _user = null;
           _tab = 0;
           _records = const [];
+          _deviceStats.clear();
           _error = null;
         });
       }
@@ -572,6 +603,106 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
     );
   }
 
+  /// Cartão responsivo com as métricas oficiais da Gestão de Dispositivos.
+  Widget _deviceCard(SmartFarmRecord record) {
+    final fields = record.fields;
+    final alias = (fields['uavAlias'] ??
+            fields['deviceSn'] ?? fields['sn'] ?? '')
+        .toString().trim();
+    final nickname = (fields['uavNickname'] ?? '').toString().trim();
+    final metrics = SmartFarmDeviceMetrics.fromDetails(
+      _deviceStats[alias] ?? fields,
+    );
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: _panelDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: _accent.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.flight_outlined, color: _accent),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nickname.isEmpty ? 'Sem apelido' : nickname,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      alias.isEmpty ? 'Código não informado' : alias,
+                      style: const TextStyle(color: _muted, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(height: 1, color: _outline),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    Text(
+                      metrics.areaHa,
+                      style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Área de Trabalho (ha)',
+                      style: TextStyle(color: _muted, fontSize: 11),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              Container(height: 40, width: 1, color: _outline),
+              Expanded(
+                child: Column(
+                  children: [
+                    Text(
+                      metrics.flightHours,
+                      style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Horas de Voo',
+                      style: TextStyle(color: _muted, fontSize: 11),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _shortcut({
     required String title,
     required String subtitle,
@@ -858,6 +989,8 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
                   ),
                 ),
               )
+            else if (resource == SmartFarmResource.devices)
+              _deviceCard(record)
             else
               Container(
               margin: const EdgeInsets.only(bottom: 10),
