@@ -2,6 +2,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:smartfarm_mobile/src/data/smartfarm_api.dart';
 
 void main() {
+  test('converte área em mu para hectares e segundos para horas', () {
+    final metrics = SmartFarmDeviceMetrics.fromDetails({
+      'workArea': 2.55,
+      'flightTime': 7200,
+      '_confirmed': true,
+    });
+    expect(metrics.areaHa, '0,17');
+    expect(metrics.flightHours, '2');
+  });
+
+  test('prioriza horas diretas e não fabrica métricas ausentes', () {
+    final direct = SmartFarmDeviceMetrics.fromDetails({
+      'workArea': 223.2,
+      'flightHours': 1.25,
+      'flightTime': 9999,
+      '_confirmed': true,
+    });
+    expect(direct.areaHa, '14,88');
+    expect(direct.flightHours, '1,25');
+    final missing = SmartFarmDeviceMetrics.fromDetails(null);
+    expect(missing.areaHa, '—');
+    expect(missing.flightHours, '—');
+    final empty = SmartFarmDeviceMetrics.fromDetails({'_confirmed': true});
+    expect(empty.areaHa, '0,00');
+    expect(empty.flightHours, '0');
+  });
+
   test('prioriza o nome da conta EAVision sobre o e-mail de login', () {
     expect(
       smartFarmAccountDisplayName({
