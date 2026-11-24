@@ -158,6 +158,9 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
   bool _fullScreen = false;
   Position? _myPosition;
   bool _locating = false;
+  bool _editingBoundary = false;
+  bool _savingBoundary = false;
+  List<LatLng> _draftBoundary = [];
 
   @override
   void initState() {
@@ -224,6 +227,122 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
     }
   }
 
+  Future<void> _renamePlot() async {
+    final detail = await _detail;
+    if (!mounted) return;
+    final fields = {...widget.record.fields, ...detail};
+    final id = int.tryParse(PlotDisplay.id(fields));
+    final geometry = PlotGeometry.fromFields(fields);
+    if (id == null || geometry.boundaries.isEmpty) return;
+    final controller = TextEditingController(text: PlotDisplay.name(fields));
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar nome do talhão'),
+        content: TextField(
+          key: const Key('plot-rename-input'),
+          controller: controller, maxLength: 50,
+          decoration: const InputDecoration(labelText: 'Novo nome'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Continuar')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted || name == null || name.isEmpty ||
+        name == PlotDisplay.name(fields)) return;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmar alteração'),
+        content: Text('Renomear o talhão para "' + name +
+          '" na EAVision? O perímetro existente será preservado.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Salvar')),
+        ],
+      ),
+    );
+    if (approved != true || !mounted) return;
+    try {
+      final ring = geometry.boundaries.first;
+      await widget.gateway.savePlotBoundary(
+        fieldId: id, fieldName: name,
+        points: ring.map((p) => {'lat': p.latitude, 'lng': p.longitude}).toList(),
+      );
+      if (mounted) setState(_reload);
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  Future<void> _beginEditBoundary() async {
+    final details = await _detail;
+    if (!mounted) return;
+    final geo = PlotGeometry.fromFields({...widget.record.fields, ...details});
+    if (!geo.hasBoundary) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('O limite do talhão não está disponível.')),
+      );
+      return;
+    }
+    setState(() {
+      _editingBoundary = true;
+      _draftBoundary = [];
+      _fullScreen = true;
+    });
+  }
+
+  Future<void> _saveBoundary() async {
+    if (_savingBoundary || _draftBoundary.length < 3) return;
+    final id = int.tryParse(PlotDisplay.id(widget.record.fields));
+    if (id == null) return;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Substituir limite do talhão?'),
+        content: Text('Você desenhou ' + _draftBoundary.length.toString() +
+          ' vértices. A EAVision será atualizada somente após confirmar. '
+          'Obstáculos e exclusões existentes serão preservados. '
+          'Revise o perímetro antes de continuar.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Salvar na EAVision')),
+        ],
+      ),
+    );
+    if (approved != true || !mounted) return;
+    setState(() => _savingBoundary = true);
+    try {
+      await widget.gateway.savePlotBoundary(
+        fieldId: id,
+        points: _draftBoundary.map((p) =>
+          {'lat': p.latitude, 'lng': p.longitude}).toList(),
+      );
+      if (mounted) setState(() {
+        _editingBoundary = false;
+        _savingBoundary = false;
+        _draftBoundary = [];
+        _reload();
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _savingBoundary = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
+
   Widget _map(PlotGeometry geometry, {double? viewportHeight}) {
     final bounds = geometry.bounds;
     if (bounds == null) {
@@ -268,6 +387,11 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
               mapController: _controller,
               options: MapOptions(
                 initialCenter: bounds.center,
+                onTap: (_, point) {
+                  if (_editingBoundary && _draftBoundary.length < 500) {
+                    setState(() => _draftBoundary = [..._draftBoundary, point]);
+                  }
+                },
                 initialZoom: 15,
                 minZoom: 2,
                 maxZoom: 20,
@@ -311,6 +435,25 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                       ),
                   ],
                 ),
+                if (_editingBoundary) ...[
+                  if (_draftBoundary.length >= 3)
+                    PolygonLayer(polygons: [
+                      Polygon(
+                        points: _draftBoundary,
+                        color: const Color(0x33FFC35A),
+                        borderColor: const Color(0xFFFFC35A),
+                        borderStrokeWidth: 3,
+                      ),
+                    ]),
+                  MarkerLayer(markers: [
+                    for (final p in _draftBoundary)
+                      Marker(
+                        point: p, width: 20, height: 20,
+                        child: const Icon(Icons.circle,
+                          color: Color(0xFFFFC35A), size: 15),
+                      ),
+                  ]),
+                ],
                 if (_myPosition != null) ...[
                   CircleLayer(circles: [
                     CircleMarker(
@@ -340,7 +483,32 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
             ),
             Positioned(
               bottom: 12, left: 12, right: 12,
-              child: Row(children: [
+              child: _editingBoundary
+                ? Row(children: [
+                    IconButton(
+                      key: const Key('plot-boundary-cancel'),
+                      tooltip: 'Cancelar edição',
+                      onPressed: () => setState(() {
+                        _editingBoundary = false;
+                        _draftBoundary = [];
+                      }),
+                      icon: const Icon(Icons.close, color: Colors.white),
+                    ),
+                    Expanded(child: OutlinedButton(
+                      key: const Key('plot-boundary-undo'),
+                      onPressed: _draftBoundary.isEmpty ? null :
+                        () => setState(() => _draftBoundary.removeLast()),
+                      child: Text('Desfazer (' + _draftBoundary.length.toString() + ')'),
+                    )),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      key: const Key('plot-boundary-save'),
+                      onPressed: _savingBoundary || _draftBoundary.length < 3
+                          ? null : _saveBoundary,
+                      child: Text(_savingBoundary ? 'Salvando...' : 'Salvar limite'),
+                    ),
+                  ])
+                : Row(children: [
                 Expanded(child: FilledButton.icon(
                   key: const Key('plot-gps'),
                   style: FilledButton.styleFrom(
@@ -472,6 +640,20 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
     appBar: AppBar(
       title: Text(_fullScreen ? 'Talhão · Mapa ampliado' : 'Mapa do talhão'),
       actions: [
+        if (!_editingBoundary)
+          IconButton(
+            key: const Key('plot-rename'),
+            tooltip: 'Renomear talhão',
+            icon: const Icon(Icons.drive_file_rename_outline),
+            onPressed: _renamePlot,
+          ),
+        if (!_editingBoundary)
+          IconButton(
+            key: const Key('plot-boundary-edit'),
+            tooltip: 'Redesenhar limite',
+            icon: const Icon(Icons.edit_location_alt_outlined),
+            onPressed: _beginEditBoundary,
+          ),
         IconButton(
           key: const Key('plot-map-fullscreen'),
           tooltip: _fullScreen
