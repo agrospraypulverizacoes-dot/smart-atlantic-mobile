@@ -5,6 +5,7 @@ import '../data/smartfarm_api.dart';
 import '../plots/kml_import_page.dart';
 import '../plots/smartfarm_plot_map_page.dart';
 import '../plots/plot_geometry.dart';
+import '../plots/field_mobile_tools.dart';
 import 'web_modules_page.dart';
 
 // Atlantic Smart Farm design tokens — fonte: RAG SMARTFARM/app/static/atlantic-theme.css.
@@ -120,6 +121,9 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
   bool _loadingMore = false;
   int _recordsVersion = 0;
   String _plotQuery = '';
+  String _plotDemandFilter = 'all';
+  bool _plotFavoritesOnly = false;
+  Set<String> _plotFavorites = <String>{};
 
   @override
   void initState() {
@@ -146,6 +150,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
       _user = user;
       _booting = false;
     });
+    if (user != null) unawaited(_loadPlotFavorites(user));
   }
 
   Future<void> _login() async {
@@ -166,6 +171,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
         _tab = 0;
         _error = null;
       });
+      unawaited(_loadPlotFavorites(user));
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = error.toString());
@@ -182,6 +188,8 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
       _records = const [];
       _deviceStats.clear();
       _deviceNicknames.clear();
+      _plotDemandFilter = 'all';
+      _plotFavoritesOnly = false;
       _recordsPage = 0;
       _recordsHasMore = false;
       _loadingMore = false;
@@ -295,6 +303,33 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
     );
   }
 
+  Future<void> _loadPlotFavorites(String account) async {
+    try {
+      final ids = await FieldFavorites(account).load();
+      if (!mounted || _user != account) return;
+      setState(() => _plotFavorites = ids);
+    } catch (_) {
+      // Falha no armazenamento local não impede consultas dos talhões.
+    }
+  }
+
+  Future<void> _togglePlotFavorite(String id) async {
+    if (id.isEmpty || _user == null) return;
+    final before = Set<String>.from(_plotFavorites);
+    final changed = Set<String>.from(before);
+    if (!changed.remove(id)) changed.add(id);
+    setState(() => _plotFavorites = changed);
+    try {
+      await FieldFavorites(_user!).save(changed);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _plotFavorites = before);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível salvar os favoritos.')),
+      );
+    }
+  }
+
   Future<void> _logout() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -311,6 +346,9 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
           _records = const [];
           _deviceStats.clear();
           _deviceNicknames.clear();
+          _plotFavorites.clear();
+          _plotDemandFilter = 'all';
+          _plotFavoritesOnly = false;
           _error = null;
         });
       }
@@ -918,18 +956,37 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
 
   Widget _recordsScreen() {
     final resource = SmartFarmResource.values[_tab - 1];
-    final visible = resource != SmartFarmResource.plots ||
-        _plotQuery.trim().isEmpty
+    final demands = <String, String>{};
+    if (resource == SmartFarmResource.plots) {
+      for (final record in _records) {
+        final id = (record.fields['requirementId'] ?? '').toString().trim();
+        if (id.isEmpty) continue;
+        demands.putIfAbsent(id, () {
+          final name = PlotDisplay.requirement(record.fields);
+          return name.isEmpty || name == id ? 'Demanda #' + id : name;
+        });
+      }
+    }
+    final visible = resource != SmartFarmResource.plots
         ? _records
         : _records.where((record) {
             final fields = record.fields;
-            final combined = [
+            final id = PlotDisplay.id(fields);
+            if (_plotFavoritesOnly && !_plotFavorites.contains(id)) {
+              return false;
+            }
+            if (_plotDemandFilter != 'all' &&
+                (fields['requirementId'] ?? '').toString() != _plotDemandFilter) {
+              return false;
+            }
+            final term = _plotQuery.toLowerCase().trim();
+            if (term.isEmpty) return true;
+            return [
               PlotDisplay.name(fields),
-              PlotDisplay.id(fields),
+              id,
               PlotDisplay.requirement(fields),
               PlotDisplay.location(fields),
-            ].join(' ').toLowerCase();
-            return combined.contains(_plotQuery.toLowerCase().trim());
+            ].join(' ').toLowerCase().contains(term);
           }).toList(growable: false);
     if (_busy) {
       return const Center(child: CircularProgressIndicator(color: _accent));
@@ -988,7 +1045,43 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
               ),
               onChanged: (value) => setState(() => _plotQuery = value),
             ),
-            const SizedBox(height: 13),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              key: const Key('plot-demand-filter'),
+              initialValue: demands.containsKey(_plotDemandFilter)
+                  ? _plotDemandFilter
+                  : 'all',
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Demanda',
+                prefixIcon: Icon(Icons.filter_list),
+              ),
+              items: [
+                const DropdownMenuItem(value: 'all',
+                    child: Text('Todas as demandas')),
+                for (final entry in demands.entries)
+                  DropdownMenuItem(
+                    value: entry.key,
+                    child: Text(entry.value, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: (value) =>
+                  setState(() => _plotDemandFilter = value ?? 'all'),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilterChip(
+                key: const Key('plot-favorites-filter'),
+                avatar: Icon(_plotFavoritesOnly
+                    ? Icons.star_rounded : Icons.star_border_rounded,
+                    color: const Color(0xFFFFC35A), size: 18),
+                label: Text('Favoritos (' + _plotFavorites.length.toString() + ')'),
+                selected: _plotFavoritesOnly,
+                onSelected: (v) => setState(() => _plotFavoritesOnly = v),
+              ),
+            ),
+            const SizedBox(height: 11),
           ],
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
@@ -1032,6 +1125,10 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
             if (resource == SmartFarmResource.plots)
               SmartFarmPlotCard(
                 record: record,
+                isFavorite: _plotFavorites.contains(
+                    PlotDisplay.id(record.fields)),
+                onFavorite: () => _togglePlotFavorite(
+                    PlotDisplay.id(record.fields)),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => SmartFarmPlotMapPage(
