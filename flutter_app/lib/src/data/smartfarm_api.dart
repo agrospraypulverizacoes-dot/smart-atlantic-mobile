@@ -260,6 +260,23 @@ abstract class SmartFarmGateway {
     SmartFarmModule module, SmartFarmRecord record,
   ) async => record.fields;
   /// Apelidos são salvos no SmartFarm e compartilhados com o Web.
+  /// Demanda válida é obrigatória para criar/importar um talhão.
+  Future<List<Map<String, dynamic>>> plotDemands() async => const [];
+
+  /// Criação de talhão por KML, usando o mesmo endpoint do Web.
+  Future<Map<String, dynamic>> importPlotKml({
+    required int requirementId,
+    required String fileName,
+    required List<int> bytes,
+  }) => throw const SmartFarmApiException('Importação indisponível.');
+
+  /// Atualiza nome/limite após confirmação do operador.
+  Future<Map<String, dynamic>> savePlotBoundary({
+    required int fieldId,
+    required List<Map<String, double>> points,
+    String? fieldName,
+  }) => throw const SmartFarmApiException('Edição indisponível.');
+
   Future<Map<String, String>> deviceNicknames() async => const {};
   Future<void> saveDeviceNickname(String uavAlias, String nickname) async {
     throw const SmartFarmApiException('Edição não disponível neste ambiente.');
@@ -451,6 +468,95 @@ class SmartFarmApi implements SmartFarmGateway {
       response, pageIndex: pageIndex, pageSize: pageSize,
       paged: module.paged,
     );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> plotDemands() async {
+    final response = await _request('/api/v1/eav/demands');
+    final raw = response['items'] ?? response['data'] ?? response['demands'];
+    if (raw is! List) return const [];
+    return [
+      for (final item in raw)
+        if (item is Map && item['requirementId'] != null)
+          Map<String, dynamic>.from(item),
+    ];
+  }
+
+  @override
+  Future<Map<String, dynamic>> savePlotBoundary({
+    required int fieldId,
+    required List<Map<String, double>> points,
+    String? fieldName,
+  }) async {
+    if (fieldId <= 0 || points.length < 3 || points.length > 500 ||
+        points.any((p) =>
+          p['lat'] == null || p['lng'] == null ||
+          p['lat']! < -90 || p['lat']! > 90 ||
+          p['lng']! < -180 || p['lng']! > 180)) {
+      throw const SmartFarmApiException('Perímetro ou talhão inválido.');
+    }
+    final name = fieldName?.trim();
+    if (name != null && (name.isEmpty || name.length > 50)) {
+      throw const SmartFarmApiException('Nome inválido (máximo 50 caracteres).');
+    }
+    final response = await _request(
+      '/api/v1/eav/plots/' + fieldId.toString() + '/boundary',
+      body: {
+        'points': points,
+        if (name != null) 'fieldName': name,
+        // Não envia barreiras ou exclusões: o backend preserva os dados oficiais.
+      },
+    );
+    if (response['status'] != 200 && response['ok'] != true) {
+      throw SmartFarmApiException(
+        (response['detail'] ?? response['message'] ?? 'Alteração não confirmada.').toString(),
+      );
+    }
+    return response;
+  }
+
+  @override
+  Future<Map<String, dynamic>> importPlotKml({
+    required int requirementId,
+    required String fileName,
+    required List<int> bytes,
+  }) async {
+    if (requirementId <= 0 || bytes.isEmpty ||
+        bytes.length > 20 * 1024 * 1024 ||
+        !fileName.toLowerCase().endsWith('.kml')) {
+      throw const SmartFarmApiException('Demanda ou arquivo KML inválido.');
+    }
+    final safeName = fileName.split(RegExp(r'[/\\]')).last
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
+    final uri = _base.resolve('/api/v1/eav/plots/import-kml')
+        .replace(queryParameters: {'requirementId': requirementId.toString()});
+    try {
+      final request = await _client.postUrl(uri).timeout(const Duration(seconds: 25));
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set('X-Filename', safeName);
+      request.headers.contentType = ContentType('application', 'vnd.google-earth.kml+xml');
+      if (_cookie != null) request.headers.set(HttpHeaders.cookieHeader, _cookie!);
+      request.add(bytes);
+      final response = await request.close().timeout(const Duration(seconds: 100));
+      final text = await utf8.decoder.bind(response).join()
+          .timeout(const Duration(seconds: 100));
+      final raw = jsonDecode(text);
+      if (raw is! Map) throw const SmartFarmApiException('Resposta inesperada.');
+      final result = Map<String, dynamic>.from(raw);
+      if (response.statusCode < 200 || response.statusCode >= 300 ||
+          result['status'] != 200) {
+        throw SmartFarmApiException(
+          (result['detail'] ?? result['message'] ?? 'Importação não confirmada.').toString(),
+        );
+      }
+      return result;
+    } on TimeoutException {
+      throw const SmartFarmApiException('A importação excedeu o tempo de espera.');
+    } on SocketException {
+      throw const SmartFarmApiException('Sem conexão para enviar o KML.');
+    } on FormatException {
+      throw const SmartFarmApiException('Resposta inválida ao importar o KML.');
+    }
   }
 
   @override
