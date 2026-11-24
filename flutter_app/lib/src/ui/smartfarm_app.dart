@@ -114,6 +114,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
   bool _busy = false;
   List<SmartFarmRecord> _records = const [];
   final Map<String, Map<String, dynamic>> _deviceStats = {};
+  final Map<String, String> _deviceNicknames = {};
   int _recordsPage = 0;
   bool _recordsHasMore = false;
   bool _loadingMore = false;
@@ -180,6 +181,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
       _error = null;
       _records = const [];
       _deviceStats.clear();
+      _deviceNicknames.clear();
       _recordsPage = 0;
       _recordsHasMore = false;
       _loadingMore = false;
@@ -214,6 +216,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
       });
       if (resource == SmartFarmResource.devices) {
         unawaited(_loadDeviceStats(result.records, version, index));
+        unawaited(_loadDeviceNicknames(version, index));
       }
     } catch (error) {
       if (!mounted || _tab != index || version != _recordsVersion) return;
@@ -251,6 +254,47 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
     }
   }
 
+  Future<void> _loadDeviceNicknames(int version, int index) async {
+    try {
+      final names = await widget.gateway.deviceNicknames();
+      if (!mounted || _tab != index || version != _recordsVersion) return;
+      setState(() {
+        _deviceNicknames
+          ..clear()
+          ..addAll(names);
+      });
+    } catch (_) {
+      // Mantém o apelido da EAVision quando a preferência não estiver acessível.
+    }
+  }
+
+  void _openDeviceDetails(SmartFarmRecord record) {
+    final alias = (record.fields['uavAlias'] ?? '').toString().trim();
+    if (alias.isEmpty) return;
+    final nickname = _deviceNicknames.containsKey(alias)
+        ? _deviceNicknames[alias]!
+        : (record.fields['uavNickname'] ?? '').toString().trim();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: _panel,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _DeviceDetailsSheet(
+        gateway: widget.gateway,
+        record: record,
+        nickname: nickname,
+        initialDetails: _deviceStats[alias] ?? record.fields,
+        onSaved: (name) {
+          if (!mounted) return;
+          setState(() => _deviceNicknames[alias] = name);
+        },
+      ),
+    );
+  }
+
   Future<void> _logout() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -266,6 +310,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
           _tab = 0;
           _records = const [];
           _deviceStats.clear();
+          _deviceNicknames.clear();
           _error = null;
         });
       }
@@ -609,11 +654,17 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
     final alias = (fields['uavAlias'] ??
             fields['deviceSn'] ?? fields['sn'] ?? '')
         .toString().trim();
-    final nickname = (fields['uavNickname'] ?? '').toString().trim();
+    final nickname = _deviceNicknames.containsKey(alias)
+        ? _deviceNicknames[alias]!
+        : (fields['uavNickname'] ?? '').toString().trim();
     final metrics = SmartFarmDeviceMetrics.fromDetails(
       _deviceStats[alias] ?? fields,
     );
-    return Container(
+    return GestureDetector(
+      key: Key('device-card-' + alias),
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _openDeviceDetails(record),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: _panelDecoration(),
@@ -699,6 +750,7 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
             ],
           ),
         ],
+      ),
       ),
     );
   }
@@ -1114,6 +1166,262 @@ class _SmartFarmHomeState extends State<_SmartFarmHome> {
           label: const Text('Sair da conta'),
         ),
       ],
+    );
+  }
+}
+
+/// Detalhes do dispositivo no mesmo fluxo do SmartFarm Web.
+class _DeviceDetailsSheet extends StatefulWidget {
+  const _DeviceDetailsSheet({
+    required this.gateway,
+    required this.record,
+    required this.nickname,
+    required this.initialDetails,
+    required this.onSaved,
+  });
+
+  final SmartFarmGateway gateway;
+  final SmartFarmRecord record;
+  final String nickname;
+  final Map<String, dynamic> initialDetails;
+  final ValueChanged<String> onSaved;
+
+  @override
+  State<_DeviceDetailsSheet> createState() => _DeviceDetailsSheetState();
+}
+
+class _DeviceDetailsSheetState extends State<_DeviceDetailsSheet> {
+  late final TextEditingController _nicknameController;
+  late Map<String, dynamic> _details;
+  late String _nickname;
+  bool _editing = false;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _nickname = widget.nickname;
+    _nicknameController = TextEditingController(text: _nickname);
+    _details = Map<String, dynamic>.from(widget.initialDetails);
+    _refreshDetails();
+  }
+
+  Future<void> _refreshDetails() async {
+    try {
+      final details = await widget.gateway.moduleDetail(
+        SmartFarmModule.devices, widget.record,
+      );
+      if (!mounted) return;
+      setState(() => _details = {..._details, ...details});
+    } catch (_) {
+      // Os detalhes da lista continuam disponíveis mesmo offline.
+    }
+  }
+
+  Future<void> _saveNickname() async {
+    if (_saving) return;
+    final alias = (widget.record.fields['uavAlias'] ?? '').toString().trim();
+    final name = _nicknameController.text.trim();
+    if (alias.isEmpty || name.length > 90) {
+      setState(() => _error = 'Apelido ou identificador inválido.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.gateway.saveDeviceNickname(alias, name);
+      if (!mounted) return;
+      widget.onSaved(name);
+      setState(() {
+        _nickname = name;
+        _editing = false;
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    super.dispose();
+  }
+
+  Widget _metric(String value, String title) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 17),
+        decoration: BoxDecoration(
+          color: _background,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _outline),
+        ),
+        child: Column(
+          children: [
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 23, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            Text(title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _muted, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _field(String label, dynamic value) {
+    final text = (value ?? '').toString().trim();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 132,
+            child: Text(label,
+                style: const TextStyle(color: _muted, fontSize: 13)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SelectableText(text.isEmpty ? '—' : text,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fields = {...widget.record.fields, ..._details};
+    final metrics = SmartFarmDeviceMetrics.fromDetails(fields);
+    final alias = (fields['uavAlias'] ?? '').toString().trim();
+    return FractionallySizedBox(
+      heightFactor: 0.86,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 6),
+              child: Row(children: [
+                const Expanded(
+                  child: Text('Detalhes do Dispositivo',
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w800)),
+                ),
+                IconButton(
+                  tooltip: 'Fechar detalhes',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: _muted),
+                ),
+              ]),
+            ),
+            const Divider(color: _outline),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                children: [
+                  Text(_nickname.isEmpty ? (alias.isEmpty ? 'Aeronave' : alias) : _nickname,
+                      style: const TextStyle(
+                          fontSize: 19, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    _metric(metrics.areaHa, 'Área de Trabalho (ha)'),
+                    const SizedBox(width: 10),
+                    _metric(metrics.flightHours, 'Horas de Voo'),
+                  ]),
+                  const SizedBox(height: 18),
+                  _field('Identificação', alias),
+                  const Divider(color: _outline, height: 1),
+                  if (_editing) ...[
+                    const SizedBox(height: 15),
+                    TextField(
+                      key: const Key('device-nickname-input'),
+                      controller: _nicknameController,
+                      autofocus: true,
+                      maxLength: 90,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _saveNickname(),
+                      decoration: const InputDecoration(
+                        labelText: 'Apelido do drone',
+                        hintText: 'Digite um apelido',
+                      ),
+                    ),
+                    if (_error != null)
+                      Text(_error!,
+                          style: const TextStyle(
+                              color: Color(0xFFFF7A7A), fontSize: 12)),
+                    Row(children: [
+                      TextButton(
+                        onPressed: _saving
+                            ? null
+                            : () => setState(() {
+                                  _editing = false;
+                                  _error = null;
+                                  _nicknameController.text = _nickname;
+                                }),
+                        child: const Text('Cancelar'),
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        key: const Key('device-nickname-save'),
+                        onPressed: _saving ? null : _saveNickname,
+                        child: Text(_saving ? 'Salvando...' : 'Salvar apelido'),
+                      ),
+                    ]),
+                  ] else ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(children: [
+                        const Text('Apelido',
+                            style: TextStyle(color: _muted)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(_nickname.isEmpty ? '—' : _nickname,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right),
+                        ),
+                        IconButton(
+                          key: const Key('device-nickname-edit'),
+                          tooltip: 'Editar apelido',
+                          icon: const Icon(Icons.edit_outlined),
+                          onPressed: () => setState(() => _editing = true),
+                        ),
+                      ]),
+                    ),
+                    const Divider(color: _outline, height: 1),
+                  ],
+                  _field('Modelo', fields['uavTypeName']),
+                  const Divider(color: _outline, height: 1),
+                  _field('Código da aeronave', fields['uavCode']),
+                  const Divider(color: _outline, height: 1),
+                  _field('Código do dispositivo', fields['deviceCode']),
+                  const Divider(color: _outline, height: 1),
+                  _field('Código do produto', fields['productCode']),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'As métricas são consultadas na conta EAVision. '
+                    '“—” significa que a API não forneceu o valor.',
+                    style: TextStyle(color: _muted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
