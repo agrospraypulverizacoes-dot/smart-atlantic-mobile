@@ -69,6 +69,25 @@ class FakeGateway extends SmartFarmGateway {
 }
 
 void main() {
+  testWidgets('talhões exibem filtro de demanda e somente favoritos', (tester) async {
+    final gateway = FakeGateway()..user = 'piloto';
+    await tester.pumpWidget(SmartFarmApp(gateway: gateway));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nav-plots')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Talhão de teste'), findsOneWidget);
+    expect(find.byKey(const Key('plot-demand-filter')), findsOneWidget);
+    expect(find.byKey(const Key('plot-favorites-filter')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('plot-favorites-filter')));
+    await tester.tap(find.byKey(const Key('plot-favorites-filter')));
+    await tester.pumpAndSettle();
+    expect(find.text('Talhão de teste'), findsNothing);
+    await tester.tap(find.byKey(const Key('plot-favorites-filter')));
+    await tester.pumpAndSettle();
+    expect(find.text('Talhão de teste'), findsOneWidget);
+  });
+
   testWidgets('detalhes do drone e edição de apelido persistente', (tester) async {
     final gateway = FakeGateway()..user = 'piloto';
     await tester.pumpWidget(SmartFarmApp(gateway: gateway));
