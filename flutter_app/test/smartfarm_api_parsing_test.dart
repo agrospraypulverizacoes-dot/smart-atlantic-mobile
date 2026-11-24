@@ -45,7 +45,7 @@ void main() {
     expect(missing.areaHa, '—');
     expect(missing.flightHours, '—');
     final empty = SmartFarmDeviceMetrics.fromDetails({'_confirmed': true});
-    expect(empty.areaHa, '0,00');
+    expect(empty.areaHa, '—');
     expect(empty.flightHours, '—');
   });
 
