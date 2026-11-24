@@ -155,6 +155,9 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
   late Future<Map<String, dynamic>> _detail;
   final _controller = MapController();
   bool _satellite = true;
+  bool _satelliteUnavailable = false;
+  int _satelliteTileFailures = 0;
+  int _tileRetry = 0;
   bool _fullScreen = false;
   Position? _myPosition;
   bool _locating = false;
@@ -343,6 +346,31 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
     }
   }
 
+  void _retrySatellite() {
+    setState(() {
+      _satellite = true;
+      _satelliteUnavailable = false;
+      _satelliteTileFailures = 0;
+      _tileRetry++;
+    });
+  }
+
+  void _onSatelliteTileError(Object error) {
+    // Falhas no provedor de imagens nunca removem os perímetros da EAVision.
+    debugPrint('SMARTFARM_SATELLITE_TILE_ERROR: $error');
+    if (!_satellite || _satelliteUnavailable) return;
+    _satelliteTileFailures++;
+    if (_satelliteTileFailures < 3) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_satellite || _satelliteUnavailable) return;
+      setState(() {
+        _satellite = false;
+        _satelliteUnavailable = true;
+        _tileRetry++;
+      });
+    });
+  }
+
   Widget _map(PlotGeometry geometry, {double? viewportHeight}) {
     final bounds = geometry.bounds;
     if (bounds == null) {
@@ -402,10 +430,18 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
               ),
               children: [
                 TileLayer(
-                  key: ValueKey(_satellite),
+                  key: ValueKey('$_satellite-$_tileRetry'),
                   urlTemplate: _satellite
-                      ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+                      ? 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
                       : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  // A alternativa mantém as imagens de satélite no mesmo serviço Esri.
+                  fallbackUrl: _satellite
+                      ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+                      : null,
+                  errorTileCallback: (tile, error, stackTrace) {
+                    if (_satellite) _onSatelliteTileError(error);
+                  },
+                  evictErrorTileStrategy: EvictErrorTileStrategy.dispose,
                   userAgentPackageName:
                       'br.com.atlanticdrones.smartfarm_mobile',
                   maxNativeZoom: _satellite ? 18 : 19,
@@ -545,7 +581,7 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         TextButton(
-                          onPressed: () => setState(() => _satellite = true),
+                          onPressed: _retrySatellite,
                           child: Text('Satélite',
                             style: TextStyle(
                               color: _satellite ? Colors.white : _muted,
@@ -555,7 +591,11 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                           ),
                         ),
                         TextButton(
-                          onPressed: () => setState(() => _satellite = false),
+                          onPressed: () => setState(() {
+                            _satellite = false;
+                            _satelliteUnavailable = false;
+                            _satelliteTileFailures = 0;
+                          }),
                           child: Text('Mapa',
                             style: TextStyle(
                               color: !_satellite ? Colors.white : _muted,
@@ -588,6 +628,38 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                 ],
               ),
             ),
+            if (_satelliteUnavailable)
+              Positioned(
+                top: 88, left: 12, right: 12,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xED071019),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFFB454)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 5, 6, 5),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.satellite_alt_outlined,
+                            color: Color(0xFFFFB454), size: 18),
+                        const SizedBox(width: 7),
+                        const Expanded(
+                          child: Text(
+                            'Satélite indisponível. Exibindo mapa.',
+                            style: TextStyle(fontSize: 11, color: Colors.white),
+                          ),
+                        ),
+                        TextButton(
+                          key: const Key('retry-satellite'),
+                          onPressed: _retrySatellite,
+                          child: const Text('Tentar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             Positioned(
               left: 12,
               bottom: 12,
