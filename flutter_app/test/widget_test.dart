@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smartfarm_mobile/src/data/smartfarm_api.dart';
 import 'package:smartfarm_mobile/src/ui/smartfarm_app.dart';
+import 'package:smartfarm_mobile/src/plots/smartfarm_plot_map_page.dart';
 
 class FakeGateway extends SmartFarmGateway {
   String? user;
@@ -57,6 +58,31 @@ class FakeGateway extends SmartFarmGateway {
 }
 
 void main() {
+  testWidgets('mapa do talhão alterna tela cheia e detalhes', (tester) async {
+    final record = SmartFarmRecord({
+      'fieldId': 25,
+      'fieldName': 'Talhão de teste',
+    });
+    await tester.pumpWidget(MaterialApp(
+      home: SmartFarmPlotMapPage(
+        gateway: FakeGateway(),
+        record: record,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detalhes do talhão'), findsOneWidget);
+    expect(find.byTooltip('Abrir mapa em tela cheia'), findsOneWidget);
+    await tester.tap(find.byTooltip('Abrir mapa em tela cheia'));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Sair da tela cheia'), findsOneWidget);
+    expect(find.text('Detalhes do talhão'), findsNothing);
+    await tester.tap(find.byTooltip('Sair da tela cheia'));
+    await tester.pumpAndSettle();
+    expect(find.text('Detalhes do talhão'), findsOneWidget);
+  });
+
   testWidgets('cartões de drones exibem área e horas da EAVision', (tester) async {
     final gateway = FakeGateway()..user = 'piloto';
     await tester.pumpWidget(SmartFarmApp(gateway: gateway));
