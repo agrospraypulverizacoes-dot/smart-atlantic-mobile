@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import '../data/smartfarm_api.dart';
 import 'plot_geometry.dart';
 import 'field_mobile_tools.dart';
+import 'smartfarm_plot_3d_viewer.dart';
 
 const _background = Color(0xFF071019);
 const _panel = Color(0xFF0E1A2A);
@@ -154,6 +155,7 @@ class SmartFarmPlotMapPage extends StatefulWidget {
 class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
   late Future<Map<String, dynamic>> _detail;
   final _controller = MapController();
+  bool _threeD = false;
   bool _satellite = true;
   bool _satelliteUnavailable = false;
   int _satelliteTileFailures = 0;
@@ -411,7 +413,15 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
         height: height,
         child: Stack(
           children: [
-            FlutterMap(
+            if (_threeD)
+              Positioned.fill(
+                child: SmartFarmPlot3DViewer(
+                  key: const Key('plot-3d-viewer'),
+                  geometry: geometry,
+                ),
+              ),
+            if (!_threeD)
+              FlutterMap(
               mapController: _controller,
               options: MapOptions(
                 initialCenter: bounds.center,
@@ -517,7 +527,8 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                 ),
               ],
             ),
-            Positioned(
+            if (!_threeD)
+              Positioned(
               bottom: 12, left: 12, right: 12,
               child: _editingBoundary
                 ? Row(children: [
@@ -581,25 +592,24 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         TextButton(
-                          onPressed: _retrySatellite,
-                          child: Text('Satélite',
+                          key: const Key('plot-mode-2d'),
+                          onPressed: () => setState(() => _threeD = false),
+                          child: Text('2D',
                             style: TextStyle(
-                              color: _satellite ? Colors.white : _muted,
-                              fontWeight: _satellite
+                              color: !_threeD ? Colors.white : _muted,
+                              fontWeight: !_threeD
                                   ? FontWeight.w800 : FontWeight.w400,
                             ),
                           ),
                         ),
                         TextButton(
-                          onPressed: () => setState(() {
-                            _satellite = false;
-                            _satelliteUnavailable = false;
-                            _satelliteTileFailures = 0;
-                          }),
-                          child: Text('Mapa',
+                          key: const Key('plot-mode-3d'),
+                          onPressed: _editingBoundary ? null
+                              : () => setState(() => _threeD = true),
+                          child: Text('3D',
                             style: TextStyle(
-                              color: !_satellite ? Colors.white : _muted,
-                              fontWeight: !_satellite
+                              color: _threeD ? Colors.white : _muted,
+                              fontWeight: _threeD
                                   ? FontWeight.w800 : FontWeight.w400,
                             ),
                           ),
@@ -608,7 +618,8 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                     ),
                   ),
                   const Spacer(),
-                  Container(
+                  if (!_threeD)
+                    Container(
                     decoration: BoxDecoration(
                       color: const Color(0xED071019),
                       borderRadius: BorderRadius.circular(10),
@@ -628,7 +639,7 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                 ],
               ),
             ),
-            if (_satelliteUnavailable)
+            if (!_threeD && _satelliteUnavailable)
               Positioned(
                 top: 88, left: 12, right: 12,
                 child: DecoratedBox(
@@ -660,7 +671,8 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                   ),
                 ),
               ),
-            Positioned(
+            if (!_threeD)
+              Positioned(
               left: 12,
               bottom: 12,
               child: Container(
@@ -712,14 +724,14 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
     appBar: AppBar(
       title: Text(_fullScreen ? 'Talhão · Mapa ampliado' : 'Mapa do talhão'),
       actions: [
-        if (!_editingBoundary)
+        if (!_editingBoundary && !_threeD)
           IconButton(
             key: const Key('plot-rename'),
             tooltip: 'Renomear talhão',
             icon: const Icon(Icons.drive_file_rename_outline),
             onPressed: _renamePlot,
           ),
-        if (!_editingBoundary)
+        if (!_editingBoundary && !_threeD)
           IconButton(
             key: const Key('plot-boundary-edit'),
             tooltip: 'Redesenhar limite',
