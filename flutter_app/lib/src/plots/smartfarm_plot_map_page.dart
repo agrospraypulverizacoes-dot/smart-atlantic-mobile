@@ -17,9 +17,12 @@ const _positive = Color(0xFF67C23A);
 class SmartFarmPlotCard extends StatelessWidget {
   const SmartFarmPlotCard({
     super.key, required this.record, required this.onTap,
+    this.isFavorite = false, this.onFavorite,
   });
   final SmartFarmRecord record;
   final VoidCallback onTap;
+  final bool isFavorite;
+  final VoidCallback? onFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +69,20 @@ class SmartFarmPlotCard extends StatelessWidget {
                         fontSize: 13,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    IconButton(
+                      key: Key('plot-favorite-' + id),
+                      tooltip: isFavorite
+                          ? 'Retirar dos favoritos'
+                          : 'Adicionar aos favoritos',
+                      onPressed: onFavorite,
+                      icon: Icon(isFavorite
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
+                        color: isFavorite
+                            ? const Color(0xFFFFC35A)
+                            : _muted),
+                      visualDensity: VisualDensity.compact,
+                    ),
                     const Icon(Icons.chevron_right,
                         size: 18, color: _muted),
                   ],
