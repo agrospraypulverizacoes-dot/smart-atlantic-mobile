@@ -81,6 +81,8 @@ class _KmlImportPageState extends State<KmlImportPage> {
       );
       final found = <KmlPlot>[];
       final failures = <String>[];
+      _bytes = null;
+      _fileName = null;
       for (final file in files) {
         try {
           if (!file.name.toLowerCase().endsWith('.kml')) {
@@ -99,7 +101,9 @@ class _KmlImportPageState extends State<KmlImportPage> {
       }
       if (!mounted) return;
       setState(() {
-        _plots.addAll(found);
+        _plots
+          ..clear()
+          ..addAll(found);
         _error = failures.isEmpty ? null : failures.join('\n');
       });
     } catch (error) {
@@ -166,6 +170,7 @@ class _KmlImportPageState extends State<KmlImportPage> {
             OutlinedButton(
               onPressed: () => setState(() {
                 _plots.clear(); _selection = 0; _error = null;
+                _bytes = null; _fileName = null;
               }),
               child: const Text('Limpar sessão'),
             ),
