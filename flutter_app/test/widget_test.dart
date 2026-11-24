@@ -81,17 +81,8 @@ void main() {
     expect(find.text('Detalhes do Dispositivo'), findsOneWidget);
     expect(find.text('Código da aeronave'), findsOneWidget);
     expect(find.text('Código do dispositivo'), findsOneWidget);
-    // O último campo é construído sob demanda no ListView do modal.
-    final sheetScroll = find.byType(Scrollable).last;
-    await tester.scrollUntilVisible(
-      find.text('Código do produto'), 140, scrollable: sheetScroll,
-    );
     expect(find.text('Código do produto'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('device-nickname-edit')),
-      -140,
-      scrollable: sheetScroll,
-    );
+    expect(find.byKey(const Key('device-nickname-edit')), findsOneWidget);
     await tester.tap(find.byKey(const Key('device-nickname-edit')));
     await tester.pumpAndSettle();
 
