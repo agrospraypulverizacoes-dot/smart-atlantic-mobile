@@ -1,10 +1,13 @@
 // ignore_for_file: prefer_interpolation_to_compose_strings
 import 'dart:math' as math;
 import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../data/smartfarm_api.dart';
 import 'plot_geometry.dart';
+import 'field_mobile_tools.dart';
 
 const _background = Color(0xFF071019);
 const _panel = Color(0xFF0E1A2A);
@@ -153,6 +156,8 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
   final _controller = MapController();
   bool _satellite = true;
   bool _fullScreen = false;
+  Position? _myPosition;
+  bool _locating = false;
 
   @override
   void initState() {
@@ -169,6 +174,54 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _locateMe() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      final p = await FieldLocation.locate();
+      if (!mounted) return;
+      setState(() => _myPosition = p);
+      _controller.move(LatLng(p.latitude, p.longitude), 17);
+      if (p.accuracy > 30) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('GPS aproximado (±' + p.accuracy.toStringAsFixed(0)
+              + ' m). Não use para demarcação.'),
+        ));
+      }
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  Future<void> _navigateToPlot(PlotGeometry geometry) async {
+    final center = geometry.bounds?.center;
+    if (center == null) return;
+    final allowed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rota até o talhão'),
+        content: const Text('O destino é o centro aproximado do talhão, '
+          'não necessariamente a entrada da propriedade. Confirme a rota antes de viajar.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Abrir navegação')),
+        ],
+      ),
+    );
+    if (allowed != true || !mounted) return;
+    try {
+      await FieldLocation.navigateTo(center);
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())));
+    }
   }
 
   Widget _map(PlotGeometry geometry, {double? viewportHeight}) {
@@ -258,12 +311,55 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                       ),
                   ],
                 ),
+                if (_myPosition != null) ...[
+                  CircleLayer(circles: [
+                    CircleMarker(
+                      point: LatLng(_myPosition!.latitude, _myPosition!.longitude),
+                      radius: _myPosition!.accuracy.clamp(3, 500).toDouble(),
+                      useRadiusInMeter: true,
+                      color: const Color(0x221E78FF),
+                      borderColor: const Color(0xFF52A4FF),
+                      borderStrokeWidth: 1,
+                    ),
+                  ]),
+                  MarkerLayer(markers: [
+                    Marker(
+                      point: LatLng(_myPosition!.latitude, _myPosition!.longitude),
+                      width: 34, height: 34,
+                      child: const Icon(Icons.my_location,
+                          color: Color(0xFF58B2FF), size: 27),
+                    ),
+                  ]),
+                ],
                 const RichAttributionWidget(
                   attributions: [
                     TextSourceAttribution('Esri World Imagery / OpenStreetMap'),
                   ],
                 ),
               ],
+            ),
+            Positioned(
+              bottom: 12, left: 12, right: 12,
+              child: Row(children: [
+                Expanded(child: FilledButton.icon(
+                  key: const Key('plot-gps'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xF00C2239),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: _locating ? null : _locateMe,
+                  icon: Icon(_locating ? Icons.hourglass_top : Icons.my_location,
+                      size: 18),
+                  label: Text(_locating ? 'Localizando...' : 'Meu GPS'),
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: FilledButton.icon(
+                  key: const Key('plot-route'),
+                  onPressed: () => _navigateToPlot(geometry),
+                  icon: const Icon(Icons.directions, size: 18),
+                  label: const Text('Ir ao talhão'),
+                )),
+              ]),
             ),
             Positioned(
               top: 12,
@@ -439,6 +535,19 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
                 ),
               ),
             _map(geometry),
+            if (_myPosition != null && geometry.bounds != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Precisão do GPS: ±' + _myPosition!.accuracy.toStringAsFixed(0) +
+                ' m · distância em linha reta: ' +
+                (Geolocator.distanceBetween(
+                  _myPosition!.latitude, _myPosition!.longitude,
+                  geometry.bounds!.center.latitude,
+                  geometry.bounds!.center.longitude,
+                ) / 1000).toStringAsFixed(2) + ' km',
+                style: const TextStyle(color: _muted, fontSize: 11),
+              ),
+            ],
             const SizedBox(height: 18),
             Container(
               padding: const EdgeInsets.all(17),
