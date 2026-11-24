@@ -6,6 +6,7 @@ import 'package:smartfarm_mobile/src/ui/smartfarm_app.dart';
 class FakeGateway extends SmartFarmGateway {
   String? user;
   int plotRequests = 0;
+  int deviceStatsRequests = 0;
 
   @override
   Future<String?> currentUser() async => user;
@@ -29,11 +30,49 @@ class FakeGateway extends SmartFarmGateway {
       plotRequests++;
       return [const SmartFarmRecord({'id': 123, 'name': 'Talhão de teste'})];
     }
+    if (resource == SmartFarmResource.devices) {
+      return [const SmartFarmRecord({
+        'uavAlias': 'AT-DRONE-1',
+        'uavNickname': 'Drone da fazenda',
+      })];
+    }
     return [];
+  }
+
+  @override
+  Future<Map<String, dynamic>> moduleDetail(
+    SmartFarmModule module, SmartFarmRecord record,
+  ) async {
+    if (module == SmartFarmModule.devices) {
+      deviceStatsRequests++;
+      return {
+        ...record.fields,
+        'workArea': 2.55,
+        'flightTime': 7200,
+        '_confirmed': true,
+      };
+    }
+    return record.fields;
   }
 }
 
 void main() {
+  testWidgets('cartões de drones exibem área e horas da EAVision', (tester) async {
+    final gateway = FakeGateway()..user = 'piloto';
+    await tester.pumpWidget(SmartFarmApp(gateway: gateway));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nav-devices')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Drone da fazenda'), findsOneWidget);
+    expect(find.text('AT-DRONE-1'), findsOneWidget);
+    expect(find.text('Área de Trabalho (ha)'), findsOneWidget);
+    expect(find.text('Horas de Voo'), findsOneWidget);
+    expect(find.text('0,17'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+    expect(gateway.deviceStatsRequests, 1);
+  });
+
   testWidgets('login, consulta de talhoes e logout', (tester) async {
     final gateway = FakeGateway();
     await tester.pumpWidget(SmartFarmApp(gateway: gateway));
