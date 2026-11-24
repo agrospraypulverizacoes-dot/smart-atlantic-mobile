@@ -1329,9 +1329,11 @@ class _DeviceDetailsSheetState extends State<_DeviceDetailsSheet> {
             ),
             const Divider(color: _outline),
             Expanded(
-              child: ListView(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                children: [
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   Text(_nickname.isEmpty ? (alias.isEmpty ? 'Aeronave' : alias) : _nickname,
                       style: const TextStyle(
                           fontSize: 19, fontWeight: FontWeight.w800)),
@@ -1416,7 +1418,8 @@ class _DeviceDetailsSheetState extends State<_DeviceDetailsSheet> {
                     '“—” significa que a API não forneceu o valor.',
                     style: TextStyle(color: _muted, fontSize: 11),
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
