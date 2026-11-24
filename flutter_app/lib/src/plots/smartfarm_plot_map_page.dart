@@ -136,6 +136,7 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
   late Future<Map<String, dynamic>> _detail;
   final _controller = MapController();
   bool _satellite = true;
+  bool _fullScreen = false;
 
   @override
   void initState() {
@@ -154,11 +155,11 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
     super.dispose();
   }
 
-  Widget _map(PlotGeometry geometry) {
+  Widget _map(PlotGeometry geometry, {double? viewportHeight}) {
     final bounds = geometry.bounds;
     if (bounds == null) {
       return Container(
-        height: 310,
+        height: viewportHeight ?? 310,
         decoration: BoxDecoration(
           color: _panel,
           borderRadius: BorderRadius.circular(18),
@@ -183,10 +184,13 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
         ),
       );
     }
-    final height = math.min(530.0,
-        math.max(360.0, MediaQuery.sizeOf(context).height * 0.51));
+    final height = viewportHeight ??
+        math.min(530.0,
+            math.max(360.0, MediaQuery.sizeOf(context).height * 0.51));
     return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: viewportHeight == null
+          ? BorderRadius.circular(18)
+          : BorderRadius.zero,
       child: SizedBox(
         height: height,
         child: Stack(
@@ -354,8 +358,18 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: _background,
     appBar: AppBar(
-      title: const Text('Mapa do talhão'),
+      title: Text(_fullScreen ? 'Talhão · Mapa ampliado' : 'Mapa do talhão'),
       actions: [
+        IconButton(
+          key: const Key('plot-map-fullscreen'),
+          tooltip: _fullScreen
+              ? 'Sair da tela cheia'
+              : 'Abrir mapa em tela cheia',
+          icon: Icon(_fullScreen
+              ? Icons.fullscreen_exit
+              : Icons.fullscreen),
+          onPressed: () => setState(() => _fullScreen = !_fullScreen),
+        ),
         IconButton(
           tooltip: 'Atualizar detalhes',
           icon: const Icon(Icons.refresh),
@@ -371,6 +385,14 @@ class _SmartFarmPlotMapPageState extends State<SmartFarmPlotMapPage> {
           ...?snapshot.data,
         };
         final geometry = PlotGeometry.fromFields(fields);
+        if (_fullScreen) {
+          return LayoutBuilder(
+            builder: (context, constraints) => _map(
+              geometry,
+              viewportHeight: constraints.maxHeight,
+            ),
+          );
+        }
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 13, 16, 28),
           children: [
