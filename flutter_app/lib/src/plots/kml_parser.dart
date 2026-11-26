@@ -1,5 +1,78 @@
 import 'package:xml/xml.dart';
 
+/// Usa o nome original do arquivo em vez de produzir "null_null".
+String kmlImportBaseName(String filename) {
+  final leaf = filename.replaceAll('\\', '/').split('/').last.trim();
+  final stem = leaf.toLowerCase().endsWith('.kml')
+      ? leaf.substring(0, leaf.length - 4)
+      : leaf;
+  final safe = stem
+      .replaceAll(RegExp(r'[^a-zA-Z0-9_ -]'), '_')
+      .replaceAll(RegExp(r'\s+'), '_')
+      .replaceAll(RegExp(r'_+'), '_')
+      .replaceAll(RegExp(r'^[-_]+|[-_]+$'), '');
+  if (safe.isEmpty || RegExp(r'^(null|undefined)(_(null|undefined))*$',
+      caseSensitive: false).hasMatch(safe)) {
+    return 'talhao';
+  }
+  return safe.length > 45 ? safe.substring(0, 45) : safe;
+}
+
+bool _missingName(String value) =>
+    value.trim().isEmpty ||
+    RegExp(r'^(null|undefined|none|nan)(_(null|undefined|none|nan|\d+))*$',
+        caseSensitive: false).hasMatch(value.trim());
+
+String? _explicitName(XmlElement placemark) {
+  for (final child in placemark.children.whereType<XmlElement>()) {
+    if (child.name.local != 'name') continue;
+    final name = child.innerText.trim();
+    if (!_missingName(name)) return name;
+  }
+  return null;
+}
+
+String _plotName(XmlElement placemark, String basename, int index) =>
+    _explicitName(placemark) ?? basename + '_' + index.toString();
+
+/// Preenche somente nomes ausentes, preservando os polígonos e coordenadas.
+String prepareKmlForUpload(String source, String fileName) {
+  if (source.length > 20 * 1024 * 1024) {
+    throw const FormatException('KML maior que 20 MB.');
+  }
+  late final XmlDocument document;
+  try {
+    document = XmlDocument.parse(source);
+  } on XmlException {
+    throw const FormatException('XML KML inválido.');
+  }
+  if (document.rootElement.name.local != 'kml') {
+    throw const FormatException('O documento não é KML.');
+  }
+  final placemarks = document.descendants.whereType<XmlElement>()
+      .where((node) => node.name.local == 'Placemark').toList();
+  if (placemarks.isEmpty) {
+    throw const FormatException('Nenhum Placemark encontrado.');
+  }
+  final basename = kmlImportBaseName(fileName);
+  for (var i = 0; i < placemarks.length; i++) {
+    final placemark = placemarks[i];
+    if (_explicitName(placemark) != null) continue;
+    final name = _plotName(placemark, basename, i + 1);
+    final names = placemark.children.whereType<XmlElement>()
+        .where((node) => node.name.local == 'name').toList();
+    if (names.isNotEmpty) {
+      names.first.children
+        ..clear()
+        ..add(XmlText(name));
+    } else {
+      placemark.children.insert(0,
+          XmlElement(XmlName('name'), [], [XmlText(name)]));
+    }
+  }
+  return document.toXmlString();
+}
+
 class KmlVertex {
   const KmlVertex(this.latitude, this.longitude);
   final double latitude;
@@ -62,15 +135,12 @@ List<KmlPlot> readKmlPlots(String source, String fileName) {
     throw const FormatException('O documento não é KML.');
   }
   final plots = <KmlPlot>[];
+  final basename = kmlImportBaseName(fileName);
+  var placemarkNumber = 0;
   for (final placemark in doc.descendants.whereType<XmlElement>()) {
     if (placemark.name.local != 'Placemark') continue;
-    String name = 'Talhão sem nome';
-    for (final child in placemark.children.whereType<XmlElement>()) {
-      if (child.name.local == 'name' && child.innerText.trim().isNotEmpty) {
-        name = child.innerText.trim();
-        break;
-      }
-    }
+    placemarkNumber++;
+    final name = _plotName(placemark, basename, placemarkNumber);
     final polygons = placemark.descendants.whereType<XmlElement>()
         .where((p) => p.name.local == 'Polygon').toList();
     final geometries = polygons.isNotEmpty
