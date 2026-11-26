@@ -3,6 +3,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../plots/kml_parser.dart';
+
 enum SmartFarmResource {
   plots('plots', 'Talhões'),
   devices('devices', 'Drones'),
@@ -528,15 +530,32 @@ class SmartFarmApi implements SmartFarmGateway {
     }
     final safeName = fileName.split(RegExp(r'[/\\]')).last
         .replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
+    // O backend aceita fieldName. Sem esse campo, a EAVision pode criar
+    // registros "null_null" quando Placemark não possui <name>.
+    final fieldName = kmlImportBaseName(fileName);
+    late final List<int> preparedBytes;
+    try {
+      preparedBytes = utf8.encode(
+        prepareKmlForUpload(utf8.decode(bytes), fileName),
+      );
+    } on FormatException catch (error) {
+      throw SmartFarmApiException('KML inválido: ' + error.message);
+    }
+    if (preparedBytes.length > 20 * 1024 * 1024) {
+      throw const SmartFarmApiException('KML excedeu o limite de 20 MB.');
+    }
     final uri = _base.resolve('/api/v1/eav/plots/import-kml')
-        .replace(queryParameters: {'requirementId': requirementId.toString()});
+        .replace(queryParameters: {
+          'requirementId': requirementId.toString(),
+          'fieldName': fieldName,
+        });
     try {
       final request = await _client.postUrl(uri).timeout(const Duration(seconds: 25));
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set('X-Filename', safeName);
       request.headers.contentType = ContentType('application', 'vnd.google-earth.kml+xml');
       if (_cookie != null) request.headers.set(HttpHeaders.cookieHeader, _cookie!);
-      request.add(bytes);
+      request.add(preparedBytes);
       final response = await request.close().timeout(const Duration(seconds: 100));
       final text = await utf8.decoder.bind(response).join()
           .timeout(const Duration(seconds: 100));
